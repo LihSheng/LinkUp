@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model SchemaTemplate {
+  id          String            @id @default(cuid())
+  name        String
+  description String?
+  jsonSchema  Json
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  runs        MappingRun[]
+  templates   MappingTemplate[]
+}
+
+model UploadedFile {
+  id           String       @id @default(cuid())
+  originalName String
+  storagePath  String
+  workbookMeta Json?
+  createdAt    DateTime     @default(now())
+  runs         MappingRun[]
+}
+
+model MappingRun {
+  id               String            @id @default(cuid())
+  uploadedFileId   String
+  schemaTemplateId String
+  sourceSheetName  String?
+  columnProfiles   Json?
+  sampleRows       Json?
+  suggestedMapping Json?
+  confirmedMapping Json?
+  status           String            @default("uploaded")
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+  uploadedFile     UploadedFile      @relation(fields: [uploadedFileId], references: [id])
+  schemaTemplate   SchemaTemplate    @relation(fields: [schemaTemplateId], references: [id])
+  output           GeneratedOutput?
+}
+
+model MappingTemplate {
+  id               String         @id @default(cuid())
+  schemaTemplateId String
+  name             String
+  sourceSignature  String?
+  confirmedMapping Json
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  schemaTemplate   SchemaTemplate @relation(fields: [schemaTemplateId], references: [id])
+}
+
+model GeneratedOutput {
+  id           String     @id @default(cuid())
+  mappingRunId String     @unique
+  jsonOutput   Json
+  errors       Json?
+  createdAt    DateTime   @default(now())
+  mappingRun   MappingRun @relation(fields: [mappingRunId], references: [id])
+}
