@@ -1,3 +1,5 @@
+![LinkUp logo](public/linkup-logo.png)
+
 # Linkup Schema Matcher
 
 TypeScript-first MVP for mapping Excel columns into a required JSON structure with LM Studio or Ollama suggestions and human confirmation.
