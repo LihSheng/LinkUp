@@ -19,6 +19,7 @@ export async function GET(_: Request, context: RouteContext) {
     run: {
       ...run,
       targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
+      workbookMeta: run.uploadedFile?.workbookMeta ?? null,
     },
   });
 }

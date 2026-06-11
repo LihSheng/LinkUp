@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const steps = [
-  { href: "/wizard/schema", label: "Schema", number: "01" },
+  { href: "/wizard/schema", label: "Template", number: "01" },
   { href: "/wizard/workbook", label: "Workbook", number: "02" },
   { href: "/wizard/mapping", label: "Mapping", number: "03" },
   { href: "/wizard/output", label: "Output", number: "04" },

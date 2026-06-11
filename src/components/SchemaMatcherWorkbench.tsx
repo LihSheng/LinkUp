@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, useEffect, useMemo, useState, useTransition } from "react";
+import useSWR from "swr";
 import clsx from "clsx";
 
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
@@ -160,6 +161,8 @@ async function readJson<T>(response: Response): Promise<T> {
 
   return data;
 }
+
+const swrFetcher = async (url: string) => readJson<unknown>(await fetch(url));
 
 function isTechnicalWarning(warning: string) {
   const value = warning.toLowerCase();
@@ -321,11 +324,9 @@ function getRecordPreview(output: unknown, issues: ValidationIssue[]) {
     };
   });
 }
-
-const SchemaStep = SchemaStepView;
+const SchemaStep = memo(SchemaStepView);
 
 export function SchemaMatcherWorkbench() {
-  const [templates, setTemplates] = useState<SchemaTemplate[]>([]);
   const [activeTemplateId, setActiveTemplateId] = useState<string | null>(null);
   const [activeRun, setActiveRun] = useState<MappingRun | null>(null);
   const [mappings, setMappings] = useState<FieldMapping[]>([]);
@@ -345,26 +346,27 @@ export function SchemaMatcherWorkbench() {
     source: true,
   });
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [, startTransition] = useTransition();
 
-  useEffect(() => {
-    void (async () => {
-      const data = await readJson<{ templates: SchemaTemplate[] }>(
-        await fetch("/api/schema-templates"),
-      );
-      setTemplates(data.templates);
-      const nextTemplate = data.templates[0] ?? null;
-      setActiveTemplateId((current) => current ?? nextTemplate?.id ?? null);
-    })().catch((error) => {
+  const { data: templatesData, mutate: mutateTemplates } = useSWR("/api/schema-templates", swrFetcher, {
+    onError: (error) => {
       const message = error instanceof Error ? error.message : "Failed to load templates.";
       setToasts((current) => [
         ...current,
         { id: Date.now(), tone: "warning", title: "Templates unavailable", message },
       ]);
-    });
-  }, []);
+    },
+  });
+
+  const templates: SchemaTemplate[] = useMemo(
+    () => (templatesData as { templates?: SchemaTemplate[] } | undefined)?.templates ?? [],
+    [templatesData],
+  );
+
+  const effectiveTemplateId = activeTemplateId ?? templates[0]?.id ?? null;
 
   const activeTemplate =
-    templates.find((template) => template.id === activeTemplateId) ?? null;
+    templates.find((template) => template.id === effectiveTemplateId) ?? null;
 
   useEffect(() => {
     if (toasts.length === 0) {
@@ -381,7 +383,10 @@ export function SchemaMatcherWorkbench() {
   const activeColumns = activeRun?.columnProfiles ?? EMPTY_COLUMNS;
   const sampleRows = activeRun?.sampleRows ?? EMPTY_ROWS;
   const suggestDiagnostics = activeRun?.suggestDiagnostics ?? null;
-  const rawWarnings = activeRun?.suggestedMapping?.warnings ?? [];
+  const rawWarnings = useMemo(
+    () => activeRun?.suggestedMapping?.warnings ?? [],
+    [activeRun?.suggestedMapping?.warnings],
+  );
 
   const mappingStats = useMemo(() => {
     if (!activeRun) {
@@ -399,22 +404,29 @@ export function SchemaMatcherWorkbench() {
       .map((mapping) => mapping.sourceColumn as string)
       .filter((source, index, all) => all.indexOf(source) !== index);
 
-    const mapped = mappings.filter(
-      (mapping) => Boolean(mapping.sourceColumn || mapping.constantValue),
-    ).length;
-    const requiredMissing = activeRun.targetFields.filter((field) => {
-      const mapping = mappings.find((item) => item.targetPath === field.path);
-      return field.required && !mapping?.sourceColumn && !mapping?.constantValue;
-    }).length;
-    const reviewNeeded = activeRun.targetFields.filter((field) => {
+    let mapped = 0;
+    let requiredMissing = 0;
+    let reviewNeeded = 0;
+
+    for (const field of activeRun.targetFields) {
       const mapping = mappings.find((item) => item.targetPath === field.path);
       const hasAssignment = Boolean(mapping?.sourceColumn || mapping?.constantValue);
-      const duplicate = mapping?.sourceColumn
-        ? duplicateSources.includes(mapping.sourceColumn)
-        : false;
+      if (hasAssignment) mapped++;
 
-      return hasAssignment && (duplicate || (mapping?.confidence ?? 0) < 0.9);
-    }).length;
+      if (field.required && !mapping?.sourceColumn && !mapping?.constantValue) {
+        requiredMissing++;
+        continue;
+      }
+
+      if (hasAssignment) {
+        const duplicate = mapping?.sourceColumn
+          ? duplicateSources.includes(mapping.sourceColumn)
+          : false;
+        if (duplicate || (mapping?.confidence ?? 0) < 0.9) {
+          reviewNeeded++;
+        }
+      }
+    }
 
     return {
       mapped,
@@ -439,31 +451,37 @@ export function SchemaMatcherWorkbench() {
     mappingStats.requiredMissing === 0 &&
     !isGenerating;
 
-  const blockingIssues = [
-    ...(mappingStats.requiredMissing > 0
-      ? [`${mappingStats.requiredMissing} required field(s) still need a source.`]
-      : []),
-    ...(mappingStats.duplicates > 0
-      ? [`${mappingStats.duplicates} duplicate mapping(s) need confirmation.`]
-      : []),
-    ...(hasUnsavedMappingChanges && activeRun
-      ? ["Save the reviewed mapping before previewing records."]
-      : []),
-  ];
-  const reviewIssues = [
-    ...(mappingStats.reviewNeeded > 0
-      ? [`${mappingStats.reviewNeeded} mapped field(s) still need review.`]
-      : []),
-    ...rawWarnings.filter((warning) => !isTechnicalWarning(warning)),
-  ];
-  const infoIssues = [
-    ...rawWarnings.filter((warning) => isTechnicalWarning(warning)),
-    ...(suggestDiagnostics?.usedFallback
-      ? [suggestDiagnostics.fallbackReason ?? "AI provider fallback was used."]
-      : []),
-  ];
+  const { blockingIssues, reviewIssues, infoIssues } = useMemo(() => {
+    const blocking = [
+      ...(mappingStats.requiredMissing > 0
+        ? [`${mappingStats.requiredMissing} required field(s) still need a source.`]
+        : []),
+      ...(mappingStats.duplicates > 0
+        ? [`${mappingStats.duplicates} duplicate mapping(s) need confirmation.`]
+        : []),
+      ...(hasUnsavedMappingChanges && activeRun
+        ? ["Save the reviewed mapping before previewing records."]
+        : []),
+    ];
+    const review = [
+      ...(mappingStats.reviewNeeded > 0
+        ? [`${mappingStats.reviewNeeded} mapped field(s) still need review.`]
+        : []),
+      ...rawWarnings.filter((warning) => !isTechnicalWarning(warning)),
+    ];
+    const info = [
+      ...rawWarnings.filter((warning) => isTechnicalWarning(warning)),
+      ...(suggestDiagnostics?.usedFallback
+        ? [suggestDiagnostics.fallbackReason ?? "AI provider fallback was used."]
+        : []),
+    ];
+    return { blockingIssues: blocking, reviewIssues: review, infoIssues: info };
+  }, [mappingStats, hasUnsavedMappingChanges, activeRun, rawWarnings, suggestDiagnostics]);
   const aiDegraded = Boolean(infoIssues.length > 0);
-  const validationIssues = getValidationIssues(output?.errors ?? []);
+  const validationIssues = useMemo(
+    () => getValidationIssues(output?.errors ?? []),
+    [output?.errors],
+  );
   const recordPreview = getRecordPreview(output?.jsonOutput ?? [], validationIssues);
   const selectedRecord =
     recordPreview.find((record) => record.id === selectedRecordId) ?? recordPreview[0] ?? null;
@@ -573,24 +591,28 @@ export function SchemaMatcherWorkbench() {
     });
   }, [activeColumns, activeRun, mappings]);
 
-  const stepStatuses = {
-    schema: activeTemplate ? "complete" : "in-progress",
-    workbook: activeRun ? "complete" : activeTemplate ? "in-progress" : "locked",
-    mapping: !activeRun
-      ? "locked"
-      : blockingIssues.length > 0 || reviewIssues.length > 0
-        ? "review"
-        : hasSavedMapping
-          ? "complete"
-          : "in-progress",
-    output: !activeRun
-      ? "locked"
-      : output
-        ? validationIssues.some((issue) => issue.severity === "error")
-          ? "review"
-          : "in-progress"
-        : "locked",
-  } as const;
+  const stepStatuses = useMemo(
+    () =>
+      ({
+        schema: activeTemplate ? "complete" : "in-progress",
+        workbook: activeRun ? "complete" : activeTemplate ? "in-progress" : "locked",
+        mapping: !activeRun
+          ? "locked"
+          : blockingIssues.length > 0 || reviewIssues.length > 0
+            ? "review"
+            : hasSavedMapping
+              ? "complete"
+              : "in-progress",
+        output: !activeRun
+          ? "locked"
+          : output
+            ? validationIssues.some((issue) => issue.severity === "error")
+              ? "review"
+              : "in-progress"
+            : "locked",
+      }) as const,
+    [activeTemplate, activeRun, blockingIssues.length, reviewIssues.length, hasSavedMapping, output, validationIssues],
+  );
 
   const workflowSteps: Array<{
     key: WorkflowView;
@@ -599,40 +621,43 @@ export function SchemaMatcherWorkbench() {
     enabled: boolean;
     description: string;
     status: "complete" | "in-progress" | "review" | "locked";
-  }> = [
-    {
-      key: "schema",
-      step: 1,
-      title: "Schema",
-      enabled: true,
-      description: activeTemplate?.name ?? "Choose the target structure",
-      status: stepStatuses.schema,
-    },
-    {
-      key: "workbook",
-      step: 2,
-      title: "Workbook",
-      enabled: Boolean(activeTemplate),
-      description: activeWorkbookName ?? "Load the source workbook",
-      status: stepStatuses.workbook,
-    },
-    {
-      key: "mapping",
-      step: 3,
-      title: "Mapping",
-      enabled: Boolean(activeRun),
-      description: activeRun ? `${mappingStats.mapped}/${mappingStats.total} mapped` : "Resolve suggestions",
-      status: stepStatuses.mapping,
-    },
-    {
-      key: "output",
-      step: 4,
-      title: "Output",
-      enabled: Boolean(output),
-      description: output ? "Preview generated records" : "Review records before import",
-      status: stepStatuses.output,
-    },
-  ];
+  }> = useMemo(
+    () => [
+      {
+        key: "schema",
+        step: 1,
+        title: "Schema",
+        enabled: true,
+        description: activeTemplate?.name ?? "Choose the target structure",
+        status: stepStatuses.schema,
+      },
+      {
+        key: "workbook",
+        step: 2,
+        title: "Workbook",
+        enabled: Boolean(activeTemplate),
+        description: activeWorkbookName ?? "Load the source workbook",
+        status: stepStatuses.workbook,
+      },
+      {
+        key: "mapping",
+        step: 3,
+        title: "Mapping",
+        enabled: Boolean(activeRun),
+        description: activeRun ? `${mappingStats.mapped}/${mappingStats.total} mapped` : "Resolve suggestions",
+        status: stepStatuses.mapping,
+      },
+      {
+        key: "output",
+        step: 4,
+        title: "Output",
+        enabled: Boolean(output),
+        description: output ? "Preview generated records" : "Review records before import",
+        status: stepStatuses.output,
+      },
+    ],
+    [activeTemplate, activeWorkbookName, activeRun, mappingStats.mapped, mappingStats.total, output, stepStatuses],
+  );
 
   const currentStepIndex = workflowSteps.findIndex((step) => step.key === activeView);
   const previousStep = workflowSteps[currentStepIndex - 1] ?? null;
@@ -660,7 +685,7 @@ export function SchemaMatcherWorkbench() {
   }
 
   async function handleUpload(file: File) {
-    if (!activeTemplateId) {
+    if (!effectiveTemplateId) {
       throw new Error("Create or select a schema template first.");
     }
 
@@ -685,7 +710,7 @@ export function SchemaMatcherWorkbench() {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             uploadedFileId: uploadData.uploadedFile.id,
-            schemaTemplateId: activeTemplateId,
+            schemaTemplateId: effectiveTemplateId,
           }),
         }),
       );
@@ -695,7 +720,7 @@ export function SchemaMatcherWorkbench() {
       setMappings(runData.run.targetFields.map(initialMapping));
       setOutput(null);
       setSelectedRecordId(0);
-      setActiveView("mapping");
+      startTransition(() => setActiveView("mapping"));
       addToast(
         "success",
         "Workbook ready",
@@ -797,7 +822,7 @@ export function SchemaMatcherWorkbench() {
 
       setOutput(data.output);
       setSelectedRecordId(0);
-      setActiveView("output");
+      startTransition(() => setActiveView("output"));
       addToast(
         data.validation.valid ? "success" : "warning",
         data.validation.valid ? "Output ready" : "Output needs review",
@@ -812,12 +837,12 @@ export function SchemaMatcherWorkbench() {
 
   function handleNext() {
     if (activeView === "schema" && activeTemplate) {
-      setActiveView("workbook");
+      startTransition(() => setActiveView("workbook"));
       return;
     }
 
     if (activeView === "workbook" && activeRun) {
-      setActiveView("mapping");
+      startTransition(() => setActiveView("mapping"));
       return;
     }
 
@@ -891,7 +916,7 @@ export function SchemaMatcherWorkbench() {
                   key={item.key}
                   type="button"
                   disabled={!item.enabled}
-                  onClick={() => item.enabled && setActiveView(item.key)}
+                  onClick={() => { if (item.enabled) startTransition(() => setActiveView(item.key)); }}
                   className={clsx(
                     "step-nav-item",
                     activeView === item.key && "is-active",
@@ -961,10 +986,10 @@ export function SchemaMatcherWorkbench() {
                   <span>{activeTemplate?.name ?? "Not selected"}</span>
                 </div>
                 <div className="module-links">
-                  <button type="button" onClick={() => setActiveView("schema")}>
+                  <button type="button" onClick={() => startTransition(() => setActiveView("schema"))}>
                     Change schema
                   </button>
-                  <button type="button" onClick={() => setActiveView("schema")}>
+                  <button type="button" onClick={() => startTransition(() => setActiveView("schema"))}>
                     Manage schemas
                   </button>
                 </div>
@@ -986,7 +1011,7 @@ export function SchemaMatcherWorkbench() {
                   <span>{activeRun?.sourceSheetName ?? "Not loaded"}</span>
                 </div>
                 <div className="module-links">
-                  <button type="button" onClick={() => setActiveView("workbook")}>
+                  <button type="button" onClick={() => startTransition(() => setActiveView("workbook"))}>
                     Replace file
                   </button>
                 </div>
@@ -1008,9 +1033,16 @@ export function SchemaMatcherWorkbench() {
                     }),
                   );
 
-                  setTemplates((current) => [data.template, ...current]);
+                  await mutateTemplates(
+                    (current: unknown) => {
+                      const existing = (current as { templates?: SchemaTemplate[] } | undefined)
+                        ?.templates ?? [];
+                      return { templates: [data.template, ...existing] };
+                    },
+                    { revalidate: false },
+                  );
                   setActiveTemplateId(data.template.id);
-                  setActiveView("workbook");
+                  startTransition(() => setActiveView("workbook"));
                   addToast("success", "Schema saved", `Using "${data.template.name}" for the next step.`);
                 }}
               />
@@ -1487,7 +1519,7 @@ export function SchemaMatcherWorkbench() {
           <div className="footer-actions">
             <button
               type="button"
-              onClick={() => previousStep && setActiveView(previousStep.key)}
+              onClick={() => { if (previousStep) startTransition(() => setActiveView(previousStep.key)); }}
               disabled={!previousStep}
               className="ghost-button"
             >
@@ -1699,7 +1731,7 @@ function SchemaStepView({
   );
 }
 
-function ModulePanel({
+const ModulePanel = memo(function ModulePanel({
   title,
   open,
   onToggle,
@@ -1719,18 +1751,18 @@ function ModulePanel({
       {open ? <div className="module-body">{children}</div> : null}
     </section>
   );
-}
+});
 
-function MetricCard({ label, value }: { label: string; value: string }) {
+const MetricCard = memo(function MetricCard({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric-card">
       <p>{label}</p>
       <strong>{value}</strong>
     </div>
   );
-}
+});
 
-function ValidationMessage({
+const ValidationMessage = memo(function ValidationMessage({
   issue,
   showTechnicalDetails,
 }: {
@@ -1743,4 +1775,4 @@ function ValidationMessage({
       {showTechnicalDetails ? <p className="validation-technical">{issue.technical}</p> : null}
     </article>
   );
-}
+});

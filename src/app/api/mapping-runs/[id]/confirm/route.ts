@@ -43,8 +43,7 @@ export async function POST(request: Request, context: RouteContext) {
       ...updated,
       schemaTemplate: run.schemaTemplate,
       targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
-      uploadedFile: run.uploadedFile,
-      output: run.output,
+      workbookMeta: run.uploadedFile?.workbookMeta ?? null,
     },
   });
 }

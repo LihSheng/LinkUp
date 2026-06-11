@@ -79,8 +79,7 @@ export async function POST(_: Request, context: RouteContext) {
       suggestDiagnostics,
       schemaTemplate: run.schemaTemplate,
       targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
-      uploadedFile: run.uploadedFile,
-      output: run.output,
+      workbookMeta: run.uploadedFile?.workbookMeta ?? null,
     },
   });
 }

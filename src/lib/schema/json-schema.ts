@@ -1,3 +1,4 @@
+import { cache } from "react";
 import type { ErrorObject } from "ajv";
 import Ajv from "ajv";
 import type { AnySchema } from "ajv";
@@ -12,7 +13,7 @@ type JsonSchema = {
   items?: JsonSchema;
 };
 
-export function flattenJsonSchema(
+function _flattenJsonSchema(
   schema: unknown,
   prefix = "",
   required = false,
@@ -29,7 +30,7 @@ export function flattenJsonSchema(
 
     return Object.entries(typed.properties).flatMap(([key, value]) => {
       const nextPrefix = prefix ? `${prefix}.${key}` : key;
-      return flattenJsonSchema(value, nextPrefix, requiredSet.has(key));
+      return _flattenJsonSchema(value, nextPrefix, requiredSet.has(key));
     });
   }
 
@@ -53,6 +54,8 @@ export function flattenJsonSchema(
     },
   ];
 }
+
+export const flattenJsonSchema = cache(_flattenJsonSchema);
 
 export function validateJsonAgainstSchema(
   schema: unknown,
