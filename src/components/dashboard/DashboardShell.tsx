@@ -1,9 +1,12 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 import clsx from "clsx";
+
+import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 
 const sidebarItems = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
@@ -22,6 +25,7 @@ const topNavItems = [
 
 export function DashboardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   return (
     <div className="dashboard-shell-frame">
@@ -145,6 +149,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
               type="button"
               className="dashboard-settings-btn"
               aria-label="Settings"
+              onClick={() => setIsSettingsOpen(true)}
             >
               <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
                 <circle cx="12" cy="12" r="3.2" />
@@ -156,6 +161,11 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
 
         <main className="dashboard-content">{children}</main>
       </div>
+
+      <SettingsDialog
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+      />
     </div>
   );
 }
