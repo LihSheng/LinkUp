@@ -25,6 +25,7 @@ import {
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 import { buildTemplateFieldsFromRows } from "@/lib/excel/template-import";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 export type TemplateField = {
   id: string;
@@ -54,12 +55,8 @@ type CreateTemplateModalProps = {
   initialTemplate?: SchemaTemplateDraft | null;
 };
 
-const DEFAULT_TEMPLATE_NAME = "Custom template";
-const DEFAULT_TEMPLATE_DESCRIPTION = "Define fields and schema for your mapping project";
-
-function cloneDefaultFields() {
-  return [];
-}
+const DEFAULT_TEMPLATE_NAME = "";
+const DEFAULT_TEMPLATE_DESCRIPTION = "";
 
 function fieldFromTargetPath(path: string, type: string, required: boolean): TemplateField {
   const normalizedType =
@@ -180,16 +177,17 @@ export function CreateTemplateModal({
   initialTemplate,
 }: CreateTemplateModalProps) {
   const [templateName, setTemplateName] = useState(
-    initialTemplate?.name ?? DEFAULT_TEMPLATE_NAME,
+    initialTemplate?.name ?? "",
   );
   const [templateDescription, setTemplateDescription] = useState(
-    initialTemplate?.description ?? DEFAULT_TEMPLATE_DESCRIPTION,
+    initialTemplate?.description ?? "",
   );
   const [fields, setFields] = useState<TemplateField[]>(
-    initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : cloneDefaultFields(),
+    initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : [],
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [triedSave, setTriedSave] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   function updateField<K extends keyof TemplateField>(
@@ -208,35 +206,65 @@ export function CreateTemplateModal({
       ...current,
       {
         id: `field-${nextIndex}`,
-        sourceHeader: `column_${nextIndex}`,
-        fieldName: `Field${nextIndex}`,
+        sourceHeader: "",
+        fieldName: "",
         dataType: "String",
         required: false,
       },
     ]);
+    setTriedSave(false);
   }
 
   function removeField(fieldId: string) {
     setFields((current) => current.filter((field) => field.id !== fieldId));
+    setTriedSave(false);
   }
 
   const schemaPreview = JSON.stringify(buildSchemaFromFields(fields), null, 2);
 
   async function handleSave() {
     const name = templateName.trim();
+    const errors: string[] = [];
+
+    const description = templateDescription.trim();
 
     if (!name) {
-      setError("Template name is required.");
+      errors.push("Template name is required.");
+    }
+
+    if (!description) {
+      errors.push("Template description is required.");
+    }
+
+    if (fields.length === 0) {
+      errors.push("At least one field is required.");
+    }
+
+    const emptySourceHeaders = fields.filter((f) => !f.sourceHeader.trim());
+    const emptyFieldNames = fields.filter((f) => !f.fieldName.trim());
+
+    if (emptySourceHeaders.length > 0) {
+      errors.push("Source header cannot be empty.");
+    }
+
+    if (emptyFieldNames.length > 0) {
+      errors.push("Field name cannot be empty.");
+    }
+
+    if (errors.length > 0) {
+      setTriedSave(true);
+      errors.forEach((msg) => toast.error(msg));
       return;
     }
 
+    setTriedSave(false);
     setSaving(true);
     setError(null);
 
     try {
       await onCreateTemplate({
         name,
-        description: templateDescription.trim() || undefined,
+        description: description || undefined,
         jsonSchema: buildSchemaFromFields(fields),
       });
       onClose();
@@ -295,16 +323,30 @@ export function CreateTemplateModal({
                   <span className="text-sm font-medium">Template Name</span>
                   <Input
                     value={templateName}
-                    onChange={(event) => setTemplateName(event.target.value)}
-                    className="h-auto rounded-xl px-4 py-3.5"
+                    onChange={(event) => {
+                      setTemplateName(event.target.value);
+                      setTriedSave(false);
+                    }}
+                    placeholder="e.g. Employee Import Template"
+                    className={cn(
+                      "h-auto rounded-xl px-4 py-3.5",
+                      triedSave && !templateName.trim() && "border-red-500 ring-red-500/50",
+                    )}
                   />
                 </label>
                 <label className="grid gap-2 flex-[1.4]">
                   <span className="text-sm font-medium">Template Description</span>
                   <Input
                     value={templateDescription}
-                    onChange={(event) => setTemplateDescription(event.target.value)}
-                    className="h-auto rounded-xl px-4 py-3.5"
+                    onChange={(event) => {
+                      setTemplateDescription(event.target.value);
+                      setTriedSave(false);
+                    }}
+                    placeholder="e.g. Fields for importing employee records"
+                    className={cn(
+                      "h-auto rounded-xl px-4 py-3.5",
+                      triedSave && !templateDescription.trim() && "border-red-500 ring-red-500/50",
+                    )}
                   />
                 </label>
               </div>
@@ -352,6 +394,7 @@ export function CreateTemplateModal({
                     }
 
                     setFields(detectedFields);
+                    setTriedSave(false);
                     setError(null);
                   } catch (caughtError) {
                     setError(
@@ -432,6 +475,12 @@ export function CreateTemplateModal({
                 </Button>
               </div>
 
+              {triedSave && fields.length === 0 && (
+                <p className="mt-3 text-[0.85rem] text-red-500">
+                  Add at least one field or upload a file to auto-detect fields.
+                </p>
+              )}
+
               <div className="mt-4 border border-[var(--color-border)] rounded-[18px] overflow-hidden bg-white/92 shadow-[0_10px_32px_rgba(28,28,28,0.05)]">
                 <Table>
                   <TableHeader>
@@ -449,17 +498,29 @@ export function CreateTemplateModal({
                         <TableCell className="px-4 py-2.5">
                           <Input
                             value={field.sourceHeader}
-                            onChange={(event) =>
-                              updateField(field.id, "sourceHeader", event.target.value)
-                            }
-                            className="h-auto rounded-[10px] px-3 py-2 font-mono text-[0.9rem]"
+                            onChange={(event) => {
+                              updateField(field.id, "sourceHeader", event.target.value);
+                              setTriedSave(false);
+                            }}
+                            placeholder="e.g. Full Name"
+                            className={cn(
+                              "h-auto rounded-[10px] px-3 py-2 font-mono text-[0.9rem]",
+                              triedSave && !field.sourceHeader.trim() && "border-red-500 ring-red-500/50",
+                            )}
                           />
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
                           <Input
                             value={field.fieldName}
-                            onChange={(event) => updateField(field.id, "fieldName", event.target.value)}
-                            className="h-auto rounded-[10px] px-3 py-2"
+                            onChange={(event) => {
+                              updateField(field.id, "fieldName", event.target.value);
+                              setTriedSave(false);
+                            }}
+                            placeholder="e.g. firstName"
+                            className={cn(
+                              "h-auto rounded-[10px] px-3 py-2",
+                              triedSave && !field.fieldName.trim() && "border-red-500 ring-red-500/50",
+                            )}
                           />
                         </TableCell>
                         <TableCell className="px-4 py-2.5">
@@ -577,9 +638,10 @@ export function CreateTemplateModal({
             variant="ghost"
             className="text-[#6f726f]"
             onClick={() => {
-              setTemplateName(DEFAULT_TEMPLATE_NAME);
-              setTemplateDescription(DEFAULT_TEMPLATE_DESCRIPTION);
+              setTemplateName("");
+              setTemplateDescription("");
               setFields(initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : []);
+              setTriedSave(false);
               setError(null);
             }}
           >

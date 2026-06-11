@@ -7,6 +7,7 @@ type WizardFooterProps = {
   statusReady?: boolean;
   primaryLabel: string;
   onPrimary: () => void;
+  primaryDisabled?: boolean;
   secondaryLabel?: string;
   onSecondary?: () => void;
 };
@@ -16,6 +17,7 @@ export function WizardFooter({
   statusReady,
   primaryLabel,
   onPrimary,
+  primaryDisabled,
   secondaryLabel,
   onSecondary,
 }: WizardFooterProps) {
@@ -32,7 +34,7 @@ export function WizardFooter({
           <p>{statusText}</p>
         </div>
       </div>
-      <button type="button" className="primary-button" onClick={onPrimary}>
+      <button type="button" className="primary-button" onClick={onPrimary} disabled={primaryDisabled}>
         {primaryLabel}
       </button>
     </section>

@@ -83,6 +83,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
           stepNumber={`Step ${activeStep.number}`}
           title={activeStep.title}
           description={activeStep.description}
+          requireBackConfirmation={activeStep.number === "02" || activeStep.number === "03"}
         />
 
         <main className="wizard-content">{children}</main>

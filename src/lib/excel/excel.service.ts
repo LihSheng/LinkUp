@@ -7,6 +7,10 @@ import {
   detectHeaderRowByTemplate,
   type CanonicalField,
 } from "@/lib/excel/header-detection";
+import {
+  buildTemplateFieldsFromRows,
+  detectTemplateHeaderRow,
+} from "@/lib/excel/template-import";
 
 async function readWorkbook(filePath: string) {
   const buffer = await readFile(filePath);
@@ -143,15 +147,14 @@ function previewWithTemplate(params: {
 
 function previewFallback(params: {
   sheetName: string;
-  sheetNames: string[];
+  sheetNames: string[]; 
   rows: unknown[][];
   sampleLimit: number;
 }) {
-  const headerRowIndex = params.rows.findIndex((row) =>
-    row.some((cell) => String(cell ?? "").trim().length > 0),
-  );
+  const detectedFields = buildTemplateFieldsFromRows(params.rows);
+  const headerRowIndex = detectTemplateHeaderRow(params.rows);
 
-  if (headerRowIndex < 0) {
+  if (headerRowIndex < 0 || detectedFields.length === 0) {
     throw new Error("Could not detect a header row in the selected sheet.");
   }
 

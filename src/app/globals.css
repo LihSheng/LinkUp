@@ -765,6 +765,14 @@ summary::-webkit-details-marker {
   opacity: 0.55;
 }
 
+.upload-zone.is-dragging {
+  border-color: var(--color-ink);
+  background:
+    radial-gradient(circle at 88% 16%, rgba(255, 222, 196, 0.6), transparent 0 18%),
+    linear-gradient(135deg, rgba(252, 251, 248, 0.98), rgba(247, 244, 237, 0.98));
+  box-shadow: 0 0 0 2px var(--color-ink-12);
+}
+
 .hidden-input {
   display: none;
 }
