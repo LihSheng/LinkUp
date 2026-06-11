@@ -14,9 +14,12 @@ const jetBrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Linkup Schema Matcher",
+  title: {
+    default: "LinkUp",
+    template: "%s | LinkUp",
+  },
   description:
-    "Excel-to-JSON schema matching workbench powered by LM Studio and deterministic transforms.",
+    "A warm, schema-intelligence workspace for matching source workbooks to target schemas.",
 };
 
 export default function RootLayout({
