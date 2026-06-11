@@ -19,22 +19,21 @@ export default function OutputStepPage() {
   return (
     <WizardStepPage
       step="Step 4"
-      title="Review the generated output"
+      title="Review & export"
       description="This route is reserved for the record preview and final confirmation state. The skeleton keeps the route tree in place before the real UI lands."
       note="The output page should surface validation, transformed records, and a final confirmation action after mapping is locked."
-      primaryHref="/wizard/schema"
-      primaryLabel="Start a new wizard"
-      secondaryHref="/wizard/mapping"
-      secondaryLabel="Back to mapping"
+      statusText="Review results and export your data"
       stats={[
         { label: "Records", value: "0" },
         { label: "Warnings", value: "0" },
         { label: "Errors", value: "0" },
       ]}
+      primaryLabel="Done"
       onContinue={() => {
         completeStep(3);
-        router.push("/wizard/schema");
+        router.push("/");
       }}
+      onBack={() => router.push("/wizard/mapping")}
     >
       <div className="wizard-placeholder">
         <strong>Output preview placeholder</strong>

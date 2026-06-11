@@ -19,13 +19,10 @@ export default function WorkbookStepPage() {
   return (
     <WizardStepPage
       step="Step 2"
-      title="Upload the workbook"
+      title="Upload source file"
       description="This slot will hold file upload, sheet selection, and preview rows. The layout is ready; the implementation can land later."
       note="The upload experience should stay simple: choose the source file, inspect the sheet that looks correct, then carry its sample rows forward into mapping."
-      primaryHref="/wizard/mapping"
-      primaryLabel="Continue to mapping"
-      secondaryHref="/wizard/schema"
-      secondaryLabel="Back to schema"
+      statusText="Upload your file to continue"
       stats={[
         { label: "Sheets", value: "1" },
         { label: "Samples", value: "20" },
@@ -35,6 +32,7 @@ export default function WorkbookStepPage() {
         completeStep(1);
         router.push("/wizard/mapping");
       }}
+      onBack={() => router.push("/wizard/schema")}
     >
       <div className="wizard-placeholder">
         <strong>Workbook upload placeholder</strong>

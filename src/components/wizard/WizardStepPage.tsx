@@ -1,17 +1,18 @@
-import Link from "next/link";
+import { WizardFooter } from "./WizardFooter";
 
 type WizardStepPageProps = {
   step: string;
   title: string;
   description: string;
   note: string;
-  primaryHref: string;
-  primaryLabel: string;
-  secondaryHref?: string;
+  statusText: string;
+  statusReady?: boolean;
+  primaryLabel?: string;
   secondaryLabel?: string;
   stats: Array<{ label: string; value: string }>;
   children?: React.ReactNode;
-  onContinue?: () => void;
+  onContinue: () => void;
+  onBack?: () => void;
 };
 
 export function WizardStepPage({
@@ -19,13 +20,14 @@ export function WizardStepPage({
   title,
   description,
   note,
-  primaryHref,
-  primaryLabel,
-  secondaryHref,
-  secondaryLabel,
+  statusText,
+  statusReady,
+  primaryLabel = "Next",
+  secondaryLabel = "Back",
   stats,
   children,
   onContinue,
+  onBack,
 }: WizardStepPageProps) {
   return (
     <div className="wizard-step-page">
@@ -55,22 +57,14 @@ export function WizardStepPage({
         <div className="wizard-panel-body">{children}</div>
       </section>
 
-      <section className="wizard-footer">
-        {onContinue ? (
-          <button type="button" className="primary-button" onClick={onContinue}>
-            {primaryLabel}
-          </button>
-        ) : (
-          <Link href={primaryHref} className="primary-button">
-            {primaryLabel}
-          </Link>
-        )}
-        {secondaryHref && secondaryLabel ? (
-          <Link href={secondaryHref} className="ghost-button">
-            {secondaryLabel}
-          </Link>
-        ) : null}
-      </section>
+      <WizardFooter
+        statusText={statusText}
+        statusReady={statusReady}
+        primaryLabel={primaryLabel}
+        onPrimary={onContinue}
+        secondaryLabel={secondaryLabel}
+        onSecondary={onBack}
+      />
     </div>
   );
 }

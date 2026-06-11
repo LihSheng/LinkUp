@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { WizardFooter } from "@/components/wizard/WizardFooter";
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
@@ -321,32 +322,25 @@ export default function SchemaStepPage() {
         </button>
       </div>
 
-      <div className="template-footer">
-        <div className="template-status">
-          <span className={`template-selection-dot ${selectedTemplate ? "ready" : ""}`} />
-          <p>
-            {selectedTemplate
-              ? `Using "${selectedTemplate.name}"`
-              : "Select a schema template to continue"}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() => {
-            if (!selectedTemplate) {
-              toast.error("No template selected", {
-                description: "Please select a schema template before continuing.",
-              });
-              return;
-            }
-            completeStep(0);
-            router.push("/wizard/workbook");
-          }}
-        >
-          Next
-        </button>
-      </div>
+      <WizardFooter
+        statusText={
+          selectedTemplate
+            ? `Using "${selectedTemplate.name}"`
+            : "Select a schema template to continue"
+        }
+        statusReady={selectedTemplate !== null}
+        primaryLabel="Next"
+        onPrimary={() => {
+          if (!selectedTemplate) {
+            toast.error("No template selected", {
+              description: "Please select a schema template before continuing.",
+            });
+            return;
+          }
+          completeStep(0);
+          router.push("/wizard/workbook");
+        }}
+      />
 
       {isCreateModalOpen ? (
         <CreateTemplateModal

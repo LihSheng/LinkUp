@@ -1946,20 +1946,34 @@ summary::-webkit-details-marker {
   padding: 18px 22px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 18px;
   height: auto;
   backdrop-filter: blur(10px);
 }
 
+.wizard-topbar > div:first-child {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
 .wizard-topbar h1 {
-  margin: 6px 0 0;
+  margin: 2px 0 0;
   font-family: var(--font-display);
   color: var(--color-ink);
-  font-size: clamp(1.85rem, 3vw, 2.6rem);
-  line-height: 1.05;
-  letter-spacing: -0.05rem;
+  font-size: 1.45rem;
+  line-height: 1.2;
+  letter-spacing: -0.03rem;
   font-weight: 600;
+}
+
+.wizard-topbar-desc {
+  margin: 8px 0 0;
+  color: var(--color-muted);
+  font-size: 0.92rem;
+  line-height: 1.45;
+  max-width: 48ch;
 }
 
 .wizard-topbar-actions {
@@ -1967,6 +1981,14 @@ summary::-webkit-details-marker {
   flex-wrap: wrap;
   gap: 10px;
   justify-content: flex-end;
+  align-self: start;
+}
+
+.wizard-topbar .ghost-button {
+  min-height: 0;
+  padding: 0;
+  align-self: start;
+  line-height: 1.45;
 }
 
 .wizard-hero {
@@ -2048,8 +2070,49 @@ summary::-webkit-details-marker {
 }
 
 .wizard-footer {
-  justify-content: flex-start;
-  margin-top: auto;
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--color-border);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 18px;
+}
+
+.wizard-footer-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.wizard-footer-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.wizard-footer-status p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+}
+
+.wizard-footer-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-muted);
+  flex: 0 0 auto;
+}
+
+.wizard-footer-dot.ready {
+  background: var(--color-success, #22c55e);
+  animation: none;
+}
+
+.wizard-footer-right {
+  display: flex;
+  justify-content: flex-end;
 }
 
 /* ══════════════════════════════════════════════
@@ -2868,12 +2931,12 @@ summary::-webkit-details-marker {
     width: 100%;
   }
 
-  .template-footer {
+  .wizard-footer {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .template-footer .primary-button {
+  .wizard-footer .primary-button {
     text-align: center;
     justify-content: center;
   }
