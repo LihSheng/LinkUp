@@ -296,3 +296,10 @@ What makes Lovable's visual system distinctive is its opacity-driven depth model
 5. Two weights: 400 (everything except headings) and 600 (headings)
 6. The inset shadow on dark buttons is the signature detail — don't skip it
 7. Camera Plain Variable at weight 480 is for special display moments only
+
+## 10. Dashboard Layout
+
+- Sidebar modules: `Dashboard`, `Wizard`, `Active Schemas`, `Mapping Tools`, `Documentation`.
+- Top bar: search field, section tabs, and a settings button on one row.
+- Home content: hero headline, dark primary action card, metrics strip, active mappings cards, and footer.
+- Use dashboard-scoped CSS variables for sidebar width, content padding, card radius, and panel borders so spacing changes stay local.

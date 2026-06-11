@@ -5,6 +5,7 @@ export class OpenAICompatibleProvider implements LLMProvider {
   constructor(
     protected readonly baseUrl: string,
     protected readonly model: string,
+    protected readonly apiKey?: string,
   ) {}
 
   async generateJson<T>(params: {
@@ -29,7 +30,10 @@ export class OpenAICompatibleProvider implements LLMProvider {
     try {
       const response = await fetch(`${this.baseUrl}/chat/completions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(this.apiKey ? { Authorization: `Bearer ${this.apiKey}` } : {}),
+        },
         body: JSON.stringify({
           model: this.model,
           temperature: params.temperature ?? 0.1,
