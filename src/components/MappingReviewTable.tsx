@@ -3,6 +3,16 @@
 import { useState } from "react";
 import clsx from "clsx";
 
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import type {
   ColumnProfile,
   FieldMapping,
@@ -32,6 +42,7 @@ function getConfidenceTone(confidence: number) {
   if (confidence >= 0.85) {
     return {
       label: `${Math.round(confidence * 100)}% · High confidence`,
+      variant: "default" as const,
       className:
         "border-[var(--success)]/30 bg-[rgba(45,106,79,0.12)] text-[var(--success)]",
     };
@@ -40,6 +51,7 @@ function getConfidenceTone(confidence: number) {
   if (confidence >= 0.5) {
     return {
       label: `${Math.round(confidence * 100)}% · Needs review`,
+      variant: "secondary" as const,
       className:
         "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.18)] text-[var(--warning)]",
     };
@@ -47,6 +59,7 @@ function getConfidenceTone(confidence: number) {
 
   return {
     label: `${Math.round(confidence * 100)}% · Low confidence`,
+    variant: "destructive" as const,
     className: "border-[var(--danger)]/20 bg-[rgba(176,0,32,0.08)] text-[var(--danger)]",
   };
 }
@@ -190,254 +203,265 @@ export function MappingReviewTable({
     { key: "duplicates", label: "Duplicates" },
   ];
 
+  const statusBadgeVariant = (status: string) => {
+    switch (status) {
+      case "blocking": return "destructive" as const;
+      case "review": return "secondary" as const;
+      case "confirmed": return "default" as const;
+      default: return "outline" as const;
+    }
+  };
+
   return (
-    <div className="panel rounded-[2rem] p-6">
-      <div className="flex flex-wrap items-start justify-between gap-4">
+    <Card className="rounded-[2rem] p-6 gap-0">
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 p-0">
         <div>
-          <p className="badge">Mapping review</p>
+          <Badge variant="outline" className="rounded-full">Mapping review</Badge>
           <h2 className="mt-3 text-2xl font-semibold">Resolve what needs attention</h2>
-          <p className="mt-2 max-w-2xl text-sm text-[var(--muted)]">
+          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
             Review required fields first, then check low-confidence or duplicate mappings.
             Details stay expandable so the main pass feels lighter.
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <span className="badge">Fields: {targetFields.length}</span>
-          <span className="badge">Columns: {columns.length}</span>
-          <span className="badge">Duplicates: {filterCounts.duplicates}</span>
+          <Badge variant="secondary">Fields: {targetFields.length}</Badge>
+          <Badge variant="secondary">Columns: {columns.length}</Badge>
+          <Badge variant="secondary">Duplicates: {filterCounts.duplicates}</Badge>
         </div>
-      </div>
+      </CardHeader>
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {filters.map((item) => (
-          <button
-            key={item.key}
-            type="button"
-            onClick={() => setFilter(item.key)}
-            className={clsx(
-              "rounded-full border px-4 py-2 text-sm font-semibold transition",
-              filter === item.key
-                ? "border-[var(--foreground)] bg-[var(--foreground)] text-white"
-                : "border-[var(--line)] bg-white text-[var(--muted)] hover:border-[var(--accent)]/50",
-            )}
-          >
-            {item.label} · {filterCounts[item.key]}
-          </button>
-        ))}
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-2">
-        <button
-          type="button"
-          onClick={() => {
-            onChange(
-              mappings.map((mapping) => {
-                const field = targetFields.find((item) => item.path === mapping.targetPath);
-
-                if (field?.type !== "string" || !mapping.sourceColumn) {
-                  return mapping;
-                }
-
-                return { ...mapping, transform: "trim" };
-              }),
-            );
-          }}
-          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
-        >
-          Apply trim to text fields
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            onChange(
-              targetFields.map((field) => ({
-                targetPath: field.path,
-                sourceColumn: null,
-                confidence: 0,
-                transform: "none",
-                reason: "",
-                constantValue: null,
-              })),
-            );
-          }}
-          className="rounded-full border border-[var(--line)] bg-white px-4 py-2 text-sm font-semibold"
-        >
-          Reset all suggestions
-        </button>
-      </div>
-
-      <div className="mt-6 grid gap-4">
-        {filteredRows.map((row) => {
-          const confidenceTone = getConfidenceTone(row.confidence);
-
-          return (
-            <article
-              key={row.field.path}
-              className={clsx(
-                "rounded-[1.6rem] border p-5 transition",
-                row.status === "blocking" &&
-                  "border-[var(--danger)]/25 bg-[rgba(176,0,32,0.05)]",
-                row.status === "review" &&
-                  "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.14)]",
-                row.status === "confirmed" &&
-                  "border-[var(--success)]/20 bg-[rgba(45,106,79,0.06)]",
-                row.status === "optional" && "border-[var(--line)] bg-white/80",
-              )}
+      <CardContent className="p-0 mt-5">
+        <div className="flex flex-wrap gap-2">
+          {filters.map((item) => (
+            <Button
+              key={item.key}
+              type="button"
+              variant={filter === item.key ? "default" : "outline"}
+              size="sm"
+              className="rounded-full"
+              onClick={() => setFilter(item.key)}
             >
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-lg font-semibold">{row.field.path}</h3>
-                    <span className="badge">{row.field.type}</span>
-                    {row.field.required ? (
-                      <span className="badge border-[var(--danger)]/20 text-[var(--danger)]">
-                        Required
-                      </span>
-                    ) : null}
-                  </div>
-                  <p className="mt-2 text-sm text-[var(--muted)]">{row.statusNote}</p>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <span
-                    className={clsx(
-                      "rounded-full border px-3 py-1 text-xs font-semibold",
-                      row.status === "blocking" &&
-                        "border-[var(--danger)]/20 bg-[rgba(176,0,32,0.08)] text-[var(--danger)]",
-                      row.status === "review" &&
-                        "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.18)] text-[var(--warning)]",
-                      row.status === "confirmed" &&
-                        "border-[var(--success)]/30 bg-[rgba(45,106,79,0.12)] text-[var(--success)]",
-                      row.status === "optional" && "border-[var(--line)] bg-white text-[var(--muted)]",
-                    )}
-                  >
-                    {row.statusLabel}
-                  </span>
-                  <span
-                    className={clsx(
-                      "rounded-full border px-3 py-1 text-xs font-semibold",
-                      confidenceTone.className,
-                    )}
-                  >
-                    {confidenceTone.label}
-                  </span>
-                </div>
-              </div>
+              {item.label} · {filterCounts[item.key]}
+            </Button>
+          ))}
+        </div>
 
-              <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_220px]">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                    Suggested source
-                  </label>
-                  <select
-                    value={row.mapping.sourceColumn ?? ""}
-                    onChange={(event) => {
-                      updateMapping(row.field.path, (current) => ({
-                        ...current,
-                        sourceColumn: event.target.value || null,
-                      }));
-                    }}
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
-                  >
-                    <option value="">Unmapped</option>
-                    {columns.map((column) => (
-                      <option key={column.name} value={column.name}>
-                        {column.name}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    {row.samples.length > 0 ? (
-                      row.samples.map((sample) => (
-                        <span
-                          key={`${row.field.path}-${sample}`}
-                          className="rounded-full bg-[rgba(20,33,61,0.06)] px-3 py-1 text-xs text-[var(--muted)]"
-                        >
-                          {sample}
-                        </span>
-                      ))
-                    ) : (
-                      <p className="text-xs text-[var(--muted)]">
-                        Sample values will appear here once a source column is selected.
-                      </p>
-                    )}
-                  </div>
-                </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              onChange(
+                mappings.map((mapping) => {
+                  const field = targetFields.find((item) => item.path === mapping.targetPath);
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                  if (field?.type !== "string" || !mapping.sourceColumn) {
+                    return mapping;
+                  }
+
+                  return { ...mapping, transform: "trim" };
+                }),
+              );
+            }}
+          >
+            Apply trim to text fields
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="rounded-full"
+            onClick={() => {
+              onChange(
+                targetFields.map((field) => ({
+                  targetPath: field.path,
+                  sourceColumn: null,
+                  confidence: 0,
+                  transform: "none",
+                  reason: "",
+                  constantValue: null,
+                })),
+              );
+            }}
+          >
+            Reset all suggestions
+          </Button>
+        </div>
+
+        <div className="mt-6 grid gap-4">
+          {filteredRows.map((row) => {
+            const confidenceTone = getConfidenceTone(row.confidence);
+
+            return (
+              <article
+                key={row.field.path}
+                className={clsx(
+                  "rounded-[1.6rem] border p-5 transition",
+                  row.status === "blocking" &&
+                    "border-[var(--danger)]/25 bg-[rgba(176,0,32,0.05)]",
+                  row.status === "review" &&
+                    "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.14)]",
+                  row.status === "confirmed" &&
+                    "border-[var(--success)]/20 bg-[rgba(45,106,79,0.06)]",
+                  row.status === "optional" && "border-border bg-card/80",
+                )}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                      Transform
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-semibold">{row.field.path}</h3>
+                      <Badge variant="outline" className="rounded-full">{row.field.type}</Badge>
+                      {row.field.required ? (
+                        <Badge variant="destructive" className="rounded-full">Required</Badge>
+                      ) : null}
+                    </div>
+                    <p className="mt-2 text-sm text-muted-foreground">{row.statusNote}</p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge
+                      variant={statusBadgeVariant(row.status)}
+                      className={clsx(
+                        "rounded-full",
+                        row.status !== "optional" && row.status !== "confirmed" && row.status !== "blocking" && row.status !== "review" && "border-border bg-white text-muted-foreground",
+                      )}
+                    >
+                      {row.statusLabel}
+                    </Badge>
+                    <Badge
+                      variant={confidenceTone.variant}
+                      className={clsx("rounded-full", confidenceTone.className)}
+                    >
+                      {confidenceTone.label}
+                    </Badge>
+                  </div>
+                </div>
+
+                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_220px]">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Suggested source
                     </label>
-                    <select
-                      value={row.mapping.transform ?? "none"}
+                    <Select
+                      value={row.mapping.sourceColumn ?? ""}
+                      onValueChange={(value) => {
+                        updateMapping(row.field.path, (current) => ({
+                          ...current,
+                          sourceColumn: value || null,
+                        }));
+                      }}
+                    >
+                      <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
+                        <SelectValue placeholder="Unmapped" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Unmapped</SelectItem>
+                        {columns.map((column) => (
+                          <SelectItem key={column.name} value={column.name}>
+                            {column.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {row.samples.length > 0 ? (
+                        row.samples.map((sample) => (
+                          <span
+                            key={`${row.field.path}-${sample}`}
+                            className="rounded-full bg-[rgba(20,33,61,0.06)] px-3 py-1 text-xs text-muted-foreground"
+                          >
+                            {sample}
+                          </span>
+                        ))
+                      ) : (
+                        <p className="text-xs text-muted-foreground">
+                          Sample values will appear here once a source column is selected.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Transform
+                      </label>
+                      <Select
+                        value={row.mapping.transform ?? "none"}
+                        onValueChange={(value) => {
+                          updateMapping(row.field.path, (current) => ({
+                            ...current,
+                            transform: value as TransformRule,
+                          }));
+                        }}
+                      >
+                        <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {transformOptions.map((option) => (
+                            <SelectItem key={option} value={option}>
+                              {option}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                        Expected type
+                      </label>
+                      <div className="mt-2 rounded-2xl border border-input bg-background px-4 py-3 text-sm text-muted-foreground">
+                        {row.field.type}
+                        {row.sourceProfile ? (
+                          <span className="block text-xs text-muted-foreground">
+                            Source looks like {row.sourceProfile.detectedType}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                      Constant value
+                    </label>
+                    <input
+                      value={row.mapping.constantValue ?? ""}
                       onChange={(event) => {
                         updateMapping(row.field.path, (current) => ({
                           ...current,
-                          transform: event.target.value as TransformRule,
+                          constantValue: event.target.value || null,
                         }));
                       }}
-                      className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
-                    >
-                      {transformOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                      Expected type
-                    </label>
-                    <div className="mt-2 rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm text-[var(--muted)]">
-                      {row.field.type}
-                      {row.sourceProfile ? (
-                        <span className="block text-xs text-[var(--muted)]">
-                          Source looks like {row.sourceProfile.detectedType}
-                        </span>
-                      ) : null}
-                    </div>
+                      className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                      placeholder="Optional default"
+                    />
                   </div>
                 </div>
 
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--muted)]">
-                    Constant value
-                  </label>
-                  <input
-                    value={row.mapping.constantValue ?? ""}
+                <details className="mt-4 rounded-[1.2rem] border border-border bg-card/70 px-4 py-3">
+                  <summary className="cursor-pointer list-none text-sm font-semibold">
+                    Why this match? Manual notes
+                  </summary>
+                  <textarea
+                    value={row.mapping.reason ?? ""}
                     onChange={(event) => {
                       updateMapping(row.field.path, (current) => ({
                         ...current,
-                        constantValue: event.target.value || null,
+                        reason: event.target.value,
                       }));
                     }}
-                    className="mt-2 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3"
-                    placeholder="Optional default"
+                    className="mt-3 min-h-24 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                    placeholder="Add notes, rationale, or override comments."
                   />
-                </div>
-              </div>
-
-              <details className="mt-4 rounded-[1.2rem] border border-[var(--line)] bg-white/70 px-4 py-3">
-                <summary className="cursor-pointer list-none text-sm font-semibold">
-                  Why this match? Manual notes
-                </summary>
-                <textarea
-                  value={row.mapping.reason ?? ""}
-                  onChange={(event) => {
-                    updateMapping(row.field.path, (current) => ({
-                      ...current,
-                      reason: event.target.value,
-                    }));
-                  }}
-                  className="mt-3 min-h-24 w-full rounded-2xl border border-[var(--line)] bg-white px-4 py-3 text-sm"
-                  placeholder="Add notes, rationale, or override comments."
-                />
-              </details>
-            </article>
-          );
-        })}
-      </div>
-    </div>
+                </details>
+              </article>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

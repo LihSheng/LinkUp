@@ -1,5 +1,9 @@
 "use client";
 
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
 type JsonOutputViewerProps = {
   output: unknown;
   errors: unknown;
@@ -11,32 +15,44 @@ export function JsonOutputViewer({ output, errors }: JsonOutputViewerProps) {
 
   return (
     <div className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_320px]">
-      <div className="panel rounded-[2rem] p-6">
-        <div className="flex flex-wrap items-start justify-between gap-4">
+      <Card className="rounded-[2rem] p-6 gap-0">
+        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 p-0">
           <div>
-            <p className="badge">JSON output</p>
+            <Badge variant="outline" className="rounded-full">JSON output</Badge>
             <h2 className="mt-3 text-2xl font-semibold">Preview the generated records</h2>
-            <p className="mt-2 text-sm text-[var(--muted)]">
+            <p className="mt-2 text-sm text-muted-foreground">
               This is the transformed payload after the confirmed mapping was applied to
               every workbook row.
             </p>
           </div>
-          <span className="badge">{hasErrors ? "Validation needs review" : "Validation passed"}</span>
-        </div>
-        <pre className="code mt-5 max-h-[42rem] overflow-auto rounded-[1.5rem] bg-[#fffdfa] p-4 text-xs leading-6">
-          {JSON.stringify(output, null, 2)}
-        </pre>
-      </div>
+          <Badge variant={hasErrors ? "destructive" : "secondary"}>
+            {hasErrors ? "Validation needs review" : "Validation passed"}
+          </Badge>
+        </CardHeader>
+        <CardContent className="p-0 mt-5">
+          <ScrollArea className="max-h-[42rem] rounded-[1.5rem] bg-[#fffdfa] p-4">
+            <pre className="code text-xs leading-6 m-0">
+              {JSON.stringify(output, null, 2)}
+            </pre>
+          </ScrollArea>
+        </CardContent>
+      </Card>
 
-      <div className="panel rounded-[2rem] p-6">
-        <h3 className="text-xl font-semibold">Validation report</h3>
-        <p className="mt-2 text-sm text-[var(--muted)]">
-          Review this only if the output is blocked or you want the exact schema errors.
-        </p>
-        <pre className="code mt-4 max-h-[42rem] overflow-auto rounded-[1.5rem] bg-[#fffdfa] p-4 text-xs leading-6">
-          {JSON.stringify(errors, null, 2)}
-        </pre>
-      </div>
+      <Card className="rounded-[2rem] p-6 gap-0">
+        <CardHeader className="p-0">
+          <h3 className="text-xl font-semibold">Validation report</h3>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Review this only if the output is blocked or you want the exact schema errors.
+          </p>
+        </CardHeader>
+        <CardContent className="p-0 mt-4">
+          <ScrollArea className="max-h-[42rem] rounded-[1.5rem] bg-[#fffdfa] p-4">
+            <pre className="code text-xs leading-6 m-0">
+              {JSON.stringify(errors, null, 2)}
+            </pre>
+          </ScrollArea>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -4,7 +4,15 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 
-import { Modal } from "@/components/Modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
 import { CreateTemplateModal } from "./CreateTemplateModal";
@@ -218,6 +226,12 @@ export default function SchemaStepPage() {
           className="template-card template-card-new"
           onClick={() => setIsCreateModalOpen(true)}
         >
+          <div className="template-card-icon">
+            <svg viewBox="0 0 24 24" fill="none">
+              <line x1="12" y1="5" x2="12" y2="19" />
+              <line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+          </div>
           <h3 className="template-card-title">Add New Template</h3>
           <p className="template-card-desc">Create a new saved schema.</p>
         </button>
@@ -296,161 +310,86 @@ function TemplateDetailsModal({
   const fields = flattenJsonSchema(template.jsonSchema);
 
   return (
-    <Modal isOpen={true} onClose={onClose}>
-      <header
-        style={{
-          padding: "18px 24px",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "16px",
-          alignItems: "flex-start",
-          borderBottom: "1px solid var(--color-border)",
-        }}
+    <Dialog open={true} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="w-[calc(100vw-32px)] sm:w-[min(1180px,calc(100vw-32px))] sm:min-w-[960px] sm:max-w-[1180px] h-[calc(100vh-32px)] sm:h-[min(860px,calc(100vh-32px))] sm:min-h-[680px] sm:max-h-[calc(100vh-32px)] p-0 gap-0 overflow-hidden rounded-[22px] grid-rows-[auto_1fr]"
       >
-        <div style={{ minWidth: 0 }}>
-          <p className="dashboard-card-kicker" style={{ margin: 0 }}>
-            Saved schema
-          </p>
-          <h3 style={{ margin: "6px 0 0", color: "var(--color-ink)" }}>{template.name}</h3>
-          <p style={{ margin: "6px 0 0", color: "var(--color-muted)" }}>
-            {template.description ?? "No description yet."}
-          </p>
-        </div>
-        <button
-          type="button"
-          className="ghost-button"
-          style={{
-            minHeight: "40px",
-            padding: "0 16px",
-            marginRight: "8px",
-          }}
-          onClick={onEdit}
+        <DialogHeader
+          className="px-6 py-[18px] bg-white/66 border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
         >
-          Edit template
-        </button>
-        <button
-          type="button"
-          aria-label="Close schema details"
-          onClick={onClose}
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "9999px",
-            border: 0,
-            background: "transparent",
-            color: "var(--color-ink)",
-          }}
-        >
-          <svg viewBox="0 0 24 24" fill="none">
-            <line x1="6" y1="6" x2="18" y2="18" />
-            <line x1="6" y1="18" x2="18" y2="6" />
-          </svg>
-        </button>
-      </header>
-
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 320px",
-          minHeight: 0,
-          flex: "1 1 auto",
-        }}
-      >
-        <section style={{ padding: "24px", minHeight: 0, overflow: "auto" }}>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-              gap: "12px",
-              marginBottom: "16px",
-            }}
-          >
-            <h4 style={{ margin: 0 }}>Columns</h4>
-            <span style={{ color: "var(--color-muted)" }}>{fields.length} fields</span>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)] m-0">
+              Saved schema
+            </p>
+            <DialogTitle className="mt-1.5 text-lg">{template.name}</DialogTitle>
+            <DialogDescription className="mt-1.5">
+              {template.description ?? "No description yet."}
+            </DialogDescription>
           </div>
-
-          <div
-            style={{
-              display: "grid",
-              gap: "10px",
-              border: "1px solid var(--color-border)",
-              borderRadius: "16px",
-              overflow: "hidden",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "minmax(0, 1.4fr) 0.6fr 0.4fr",
-                gap: "12px",
-                padding: "12px 16px",
-                background: "rgba(28, 28, 28, 0.03)",
-                color: "var(--color-muted)",
-                fontSize: "0.78rem",
-                textTransform: "uppercase",
-                letterSpacing: "0.08em",
-              }}
+          <div className="flex items-center gap-2 shrink-0">
+            <Button variant="outline" onClick={onEdit}>
+              Edit template
+            </Button>
+            <DialogClose
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="rounded-full"
+                  aria-label="Close schema details"
+                />
+              }
             >
-              <span>Field</span>
-              <span>Type</span>
-              <span>Required</span>
-            </div>
-            {fields.length > 0 ? (
-              fields.map((field) => (
-                <div
-                  key={field.path}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "minmax(0, 1.4fr) 0.6fr 0.4fr",
-                    gap: "12px",
-                    padding: "12px 16px",
-                    borderTop: "1px solid var(--color-border)",
-                  }}
-                >
-                  <span style={{ color: "var(--color-ink)" }}>{field.path}</span>
-                  <span style={{ color: "var(--color-muted)" }}>{field.type}</span>
-                  <span style={{ color: "var(--color-muted)" }}>{field.required ? "Yes" : "No"}</span>
-                </div>
-              ))
-            ) : (
-              <div style={{ padding: "16px", color: "var(--color-muted)" }}>No fields found.</div>
-            )}
+              <svg viewBox="0 0 24 24" fill="none" className="size-5">
+                <line x1="6" y1="6" x2="18" y2="18" />
+                <line x1="6" y1="18" x2="18" y2="6" />
+              </svg>
+            </DialogClose>
           </div>
-        </section>
+        </DialogHeader>
 
-        <aside
-          style={{
-            padding: "24px",
-            borderLeft: "1px solid var(--color-border)",
-            background: "rgba(252, 251, 248, 0.98)",
-            minHeight: 0,
-            overflow: "hidden",
-            display: "grid",
-            gap: "12px",
-          }}
-        >
-          <h4 style={{ marginTop: 0 }}>Schema JSON</h4>
-          <pre
-            style={{
-              margin: 0,
-              padding: "16px",
-              borderRadius: "14px",
-              background: "rgba(247, 244, 237, 0.9)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-ink)",
-              overflow: "auto",
-              fontSize: "0.82rem",
-              lineHeight: 1.7,
-              whiteSpace: "pre",
-              wordBreak: "break-word",
-              maxHeight: "calc(100vh - 240px)",
-            }}
-          >
-            {JSON.stringify(template.jsonSchema, null, 2)}
-          </pre>
-        </aside>
-      </div>
-    </Modal>
+        <div className="grid grid-cols-[minmax(0,1.05fr)_420px] flex-1 min-h-0">
+          <section className="p-6 min-h-0 overflow-auto">
+            <div className="flex justify-between items-center gap-3 mb-4">
+              <h4 className="m-0 text-sm font-semibold">Columns</h4>
+              <span className="text-[var(--color-muted)] text-sm">{fields.length} fields</span>
+            </div>
+
+            <div className="border border-[var(--color-border)] rounded-[16px] overflow-hidden">
+              <div className="grid grid-cols-[1.4fr_0.6fr_0.4fr] gap-3 px-4 py-3 bg-[rgba(28,28,28,0.03)] text-[var(--color-muted)] text-[0.78rem] uppercase tracking-[0.08em]">
+                <span className="min-w-0">Field</span>
+                <span className="min-w-0">Type</span>
+                <span className="min-w-0">Required</span>
+              </div>
+              {fields.length > 0 ? (
+                fields.map((field) => (
+                  <div
+                    key={field.path}
+                    className="grid grid-cols-[1.4fr_0.6fr_0.4fr] gap-3 px-4 py-3 border-t border-[var(--color-border)]"
+                  >
+                    <span className="min-w-0 truncate text-[var(--color-ink)]">{field.path}</span>
+                    <span className="min-w-0 text-[var(--color-muted)]">{field.type}</span>
+                    <span className="min-w-0 text-[var(--color-muted)]">{field.required ? "Yes" : "No"}</span>
+                  </div>
+                ))
+              ) : (
+                <div className="p-4 text-[var(--color-muted)]">No fields found.</div>
+              )}
+            </div>
+          </section>
+
+          <aside className="p-6 border-l border-[var(--color-border)] bg-[rgba(252,251,248,0.98)] min-h-0 overflow-hidden grid gap-3 content-start">
+            <h4 className="m-0 text-sm font-semibold">Schema JSON</h4>
+            <pre
+              className="m-0 p-4 rounded-[14px] bg-[rgba(247,244,237,0.9)] border border-[var(--color-border)] text-[var(--color-ink)] overflow-auto text-[0.82rem] leading-[1.7] whitespace-pre"
+              style={{ maxHeight: "calc(100vh - 200px)" }}
+            >
+              {JSON.stringify(template.jsonSchema, null, 2)}
+            </pre>
+          </aside>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }

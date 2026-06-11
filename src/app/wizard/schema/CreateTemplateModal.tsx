@@ -2,8 +2,27 @@
 
 import { useRef, useState } from "react";
 
-import { Modal } from "@/components/Modal";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableHead,
+  TableRow,
+  TableCell,
+} from "@/components/ui/table";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
+import { cn } from "@/lib/utils";
 
 export type TemplateField = {
   id: string;
@@ -83,7 +102,7 @@ function jsonTypeFor(dataType: TemplateField["dataType"]) {
 
 function createObjectSchema() {
   return {
-    type: "object",
+    type: "object" as const,
     properties: {} as Record<string, unknown>,
   };
 }
@@ -136,15 +155,21 @@ function buildSchemaFromFields(fields: TemplateField[]) {
             })
           : createObjectSchema();
 
-      nextSchema.type = "object";
-      nextSchema.properties ??= {};
       cursor.properties[segment] = nextSchema;
-      cursor = nextSchema;
+      cursor = nextSchema as typeof cursor;
     }
   }
 
   return root;
 }
+
+const dataTypeOptions: TemplateField["dataType"][] = [
+  "String",
+  "Number",
+  "Boolean",
+  "Date",
+  "Object",
+];
 
 export function CreateTemplateModal({
   isOpen,
@@ -223,386 +248,213 @@ export function CreateTemplateModal({
   }
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose}>
-      <header
-        style={{
-          padding: "18px 32px",
-          background: "rgba(255, 255, 255, 0.66)",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "16px",
-          alignItems: "flex-start",
-          borderBottom: "1px solid var(--color-border)",
-        }}
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        showCloseButton={false}
+        className="max-w-[1120px] sm:max-w-[1120px] w-full h-[calc(100vh-56px)] sm:h-[min(760px,calc(100vh-56px))] max-h-[calc(100vh-56px)] p-0 gap-0 overflow-hidden rounded-[22px] grid-rows-[auto_1fr_auto]"
       >
-        <div style={{ minWidth: 0 }}>
-          <h3 id="template-modal-title" style={{ margin: 0, fontSize: "1.05rem", lineHeight: 1.2 }}>
-            {initialTemplate ? "Edit Saved Template" : "Create Custom Template"}
-          </h3>
-          <p style={{ margin: "4px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
-            {templateDescription}
-          </p>
-        </div>
-        <button
-          type="button"
-          style={{
-            width: "40px",
-            height: "40px",
-            borderRadius: "9999px",
-            border: 0,
-            background: "transparent",
-            color: "var(--color-ink)",
-            display: "inline-grid",
-            placeItems: "center",
-            flex: "0 0 auto",
-            cursor: "pointer",
-          }}
-          aria-label="Close custom template modal"
-          onClick={onClose}
+        <DialogHeader
+          className="px-8 py-4 bg-white/66 border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
         >
-          <svg viewBox="0 0 24 24" fill="none">
-            <line x1="6" y1="6" x2="18" y2="18" />
-            <line x1="6" y1="18" x2="18" y2="6" />
-          </svg>
-        </button>
-      </header>
+          <div className="min-w-0">
+            <DialogTitle className="text-[1.05rem] leading-snug">
+              {initialTemplate ? "Edit Saved Template" : "Create Custom Template"}
+            </DialogTitle>
+            <DialogDescription className="mt-1 text-[0.92rem] leading-snug">
+              {templateDescription}
+            </DialogDescription>
+          </div>
+          <DialogClose
+            render={
+              <Button
+                variant="ghost"
+                size="icon"
+                className="rounded-full shrink-0"
+                aria-label="Close custom template modal"
+              />
+            }
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="size-5">
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="6" y1="18" x2="18" y2="6" />
+            </svg>
+          </DialogClose>
+        </DialogHeader>
 
-      <div
-        style={{
-          flex: "1 1 auto",
-          minHeight: 0,
-          display: "grid",
-          gridTemplateColumns: "minmax(0, 1fr) 360px",
-          overflow: "hidden",
-        }}
-      >
         <div
-          style={{
-            minHeight: 0,
-            overflowY: "auto",
-            padding: "28px 32px 56px",
-            background: "rgba(255, 255, 255, 0.32)",
-          }}
+          className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_360px] overflow-hidden"
         >
-          <section>
-            <div
-              style={{
-                display: "flex",
-                gap: "14px",
-                justifyContent: "space-between",
-                alignItems: "stretch",
-              }}
-            >
-              <label style={{ display: "grid", gap: "8px", flex: "1 1 0" }}>
-                <span>Template Name</span>
-                <input
-                  style={{
-                    width: "100%",
-                    minWidth: 0,
-                    padding: "14px 16px",
-                    border: "1px solid rgba(224, 220, 214, 0.96)",
-                    borderRadius: "12px",
-                    background: "rgba(252, 251, 248, 0.98)",
-                    color: "var(--color-ink)",
-                  }}
-                  value={templateName}
-                  onChange={(event) => setTemplateName(event.target.value)}
-                />
-              </label>
-              <label style={{ display: "grid", gap: "8px", flex: "1.4 1 0" }}>
-                <span>Template Description</span>
-                <input
-                  style={{
-                    width: "100%",
-                    minWidth: 0,
-                    padding: "14px 16px",
-                    border: "1px solid rgba(224, 220, 214, 0.96)",
-                    borderRadius: "12px",
-                    background: "rgba(252, 251, 248, 0.98)",
-                    color: "var(--color-ink)",
-                  }}
-                  value={templateDescription}
-                  onChange={(event) => setTemplateDescription(event.target.value)}
-                />
-              </label>
-            </div>
-          </section>
+          <div
+            className="min-h-0 overflow-y-auto px-8 py-5 pb-8 bg-white/32"
+          >
+            <section>
+              <div className="flex gap-3 justify-between items-stretch">
+                <label className="grid gap-2 flex-1">
+                  <span className="text-sm font-medium">Template Name</span>
+                  <Input
+                    value={templateName}
+                    onChange={(event) => setTemplateName(event.target.value)}
+                    className="h-auto rounded-xl px-4 py-3.5"
+                  />
+                </label>
+                <label className="grid gap-2 flex-[1.4]">
+                  <span className="text-sm font-medium">Template Description</span>
+                  <Input
+                    value={templateDescription}
+                    onChange={(event) => setTemplateDescription(event.target.value)}
+                    className="h-auto rounded-xl px-4 py-3.5"
+                  />
+                </label>
+              </div>
+            </section>
 
-          <section style={{ marginTop: "40px" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-              <span
-                style={{
-                  width: "28px",
-                  height: "28px",
-                  borderRadius: "9999px",
-                  background: "var(--color-ink)",
-                  color: "#fff",
-                  display: "grid",
-                  placeItems: "center",
-                  fontSize: "0.85rem",
-                  fontWeight: 700,
-                }}
-              >
-                1
-              </span>
-              <h4 style={{ margin: 0 }}>Upload Sample</h4>
-            </div>
+            <section className="mt-8">
+              <div className="flex items-center gap-3">
+                <span className="size-7 rounded-full bg-[var(--color-ink)] text-white grid place-items-center text-xs font-bold shrink-0">
+                  1
+                </span>
+                <h4 className="m-0 text-sm font-semibold">Upload Sample</h4>
+              </div>
 
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".csv,.xlsx"
-              style={{ display: "none" }}
-            />
-            <div
-              role="button"
-              tabIndex={0}
-              style={{
-                marginTop: "18px",
-                padding: "24px",
-                border: "2px dashed rgba(236, 234, 228, 0.92)",
-                borderRadius: "18px",
-                background:
-                  "linear-gradient(180deg, rgba(252, 251, 248, 0.94), rgba(247, 244, 237, 0.42))",
-                display: "flex",
-                alignItems: "center",
-                gap: "20px",
-                cursor: "pointer",
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  fileInputRef.current?.click();
-                }
-              }}
-            >
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".csv,.xlsx"
+                style={{ display: "none" }}
+              />
               <div
-                style={{
-                  width: "48px",
-                  height: "48px",
-                  borderRadius: "9999px",
-                  display: "grid",
-                  placeItems: "center",
-                  flex: "0 0 auto",
-                  background: "rgba(255, 255, 255, 0.92)",
-                  border: "1px solid rgba(236, 234, 228, 0.92)",
-                  color: "var(--color-ink)",
+                role="button"
+                tabIndex={0}
+                className="mt-4 p-5 border-2 border-dashed border-[rgba(236,234,228,0.92)] rounded-[18px] bg-[linear-gradient(180deg,rgba(252,251,248,0.94),rgba(247,244,237,0.42))] flex items-center gap-4 cursor-pointer"
+                onClick={() => fileInputRef.current?.click()}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    fileInputRef.current?.click();
+                  }
                 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
-                  <path d="M7 18a4 4 0 0 1-.4-7.98A5.5 5.5 0 0 1 17 8.5h.5a3.5 3.5 0 1 1 0 7H7Z" />
-                  <path d="M12 8v8" />
-                  <path d="m8.5 11.5 3.5-3.5 3.5 3.5" />
-                </svg>
-              </div>
-              <div style={{ flex: "1 1 auto", textAlign: "left" }}>
-                <p style={{ fontWeight: 600, margin: 0 }}>Drop a .csv or .xlsx file here</p>
-                <p style={{ color: "#6f726f", fontSize: "0.85rem", margin: "4px 0 0" }}>
-                  Auto-detect fields and data types
-                </p>
-              </div>
-              <button
-                type="button"
-                style={{
-                  minHeight: "40px",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  padding: "0 20px",
-                  borderRadius: "12px",
-                  border: "1px solid rgba(224, 220, 214, 0.96)",
-                  background: "rgba(255, 255, 255, 0.9)",
-                  color: "var(--color-ink)",
-                  cursor: "pointer",
-                  flex: "0 0 auto",
-                  fontSize: "0.9rem",
-                }}
-              >
-                Browse Files
-              </button>
-            </div>
-          </section>
-
-          <section style={{ marginTop: "40px" }}>
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: "14px",
-              }}
-            >
-              <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
-                <span
-                  style={{
-                    width: "28px",
-                    height: "28px",
-                    borderRadius: "9999px",
-                    background: "var(--color-ink)",
-                    color: "#fff",
-                    display: "grid",
-                    placeItems: "center",
-                    fontSize: "0.85rem",
-                    fontWeight: 700,
+                <div className="size-12 rounded-full shrink-0 grid place-items-center bg-white/92 border border-[rgba(236,234,228,0.92)] text-[var(--color-ink)]">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
+                    <path d="M7 18a4 4 0 0 1-.4-7.98A5.5 5.5 0 0 1 17 8.5h.5a3.5 3.5 0 1 1 0 7H7Z" />
+                    <path d="M12 8v8" />
+                    <path d="m8.5 11.5 3.5-3.5 3.5 3.5" />
+                  </svg>
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-semibold m-0">Drop a .csv or .xlsx file here</p>
+                  <p className="text-[#6f726f] text-[0.85rem] mt-1 m-0">
+                    Auto-detect fields and data types
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="shrink-0 h-10 rounded-xl"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
                   }}
                 >
-                  2
-                </span>
-                <h4 style={{ margin: 0 }}>Field Configuration</h4>
+                  Browse Files
+                </Button>
               </div>
-              <button
-                type="button"
-                className="template-modal-add"
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: "10px",
-                  border: 0,
-                  background: "transparent",
-                  color: "var(--color-ink)",
-                  fontWeight: 700,
-                  fontSize: "1rem",
-                  cursor: "pointer",
-                  whiteSpace: "nowrap",
-                  flexWrap: "nowrap",
-                  minWidth: "max-content",
-                }}
-                onClick={addField}
-              >
-                <svg viewBox="0 0 24 24" fill="none">
-                  <line x1="12" y1="5" x2="12" y2="19" />
-                  <line x1="5" y1="12" x2="19" y2="12" />
-                </svg>
-                <span>Add Field</span>
-              </button>
-            </div>
+            </section>
 
-            <div
-              style={{
-                marginTop: "20px",
-                border: "1px solid var(--color-border)",
-                borderRadius: "18px",
-                overflow: "hidden",
-                background: "rgba(255, 255, 255, 0.92)",
-                boxShadow: "0 10px 32px rgba(28, 28, 28, 0.05)",
-              }}
-            >
-              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                <thead>
-                  <tr>
-                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
-                      Source Header
-                    </th>
-                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
-                      Field Name
-                    </th>
-                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
-                      Data Type
-                    </th>
-                    <th style={{ padding: "12px 16px", textAlign: "center", whiteSpace: "nowrap" }}>
-                      Req.
-                    </th>
-                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {fields.map((field) => (
-                    <tr key={field.id}>
-                      <td style={{ padding: "12px 16px" }}>
-                        <input
-                          style={{
-                            width: "100%",
-                            minWidth: 0,
-                            padding: "11px 12px",
-                            border: "1px solid rgba(224, 220, 214, 0.96)",
-                            borderRadius: "10px",
-                            background: "rgba(252, 251, 248, 0.98)",
-                            color: "var(--color-ink)",
-                            boxSizing: "border-box",
-                            fontFamily: "monospace",
-                            fontSize: "0.9rem",
-                          }}
-                          value={field.sourceHeader}
-                          onChange={(event) =>
-                            updateField(field.id, "sourceHeader", event.target.value)
-                          }
-                        />
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <input
-                          style={{
-                            width: "100%",
-                            minWidth: 0,
-                            padding: "11px 12px",
-                            border: "1px solid rgba(224, 220, 214, 0.96)",
-                            borderRadius: "10px",
-                            background: "rgba(252, 251, 248, 0.98)",
-                            color: "var(--color-ink)",
-                            boxSizing: "border-box",
-                          }}
-                          value={field.fieldName}
-                          onChange={(event) => updateField(field.id, "fieldName", event.target.value)}
-                        />
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <select
-                          style={{
-                            width: "100%",
-                            minWidth: 0,
-                            padding: "11px 12px",
-                            border: "1px solid rgba(224, 220, 214, 0.96)",
-                            borderRadius: "10px",
-                            background: "rgba(252, 251, 248, 0.98)",
-                            color: "var(--color-ink)",
-                            boxSizing: "border-box",
-                          }}
-                          value={field.dataType}
-                          onChange={(event) =>
-                            updateField(
-                              field.id,
-                              "dataType",
-                              event.target.value as TemplateField["dataType"],
-                            )
-                          }
-                        >
-                          <option value="String">String</option>
-                          <option value="Number">Number</option>
-                          <option value="Boolean">Boolean</option>
-                          <option value="Date">Date</option>
-                          <option value="Object">Object</option>
-                        </select>
-                      </td>
-                      <td style={{ padding: "12px 16px", textAlign: "center" }}>
-                        <input
-                          type="checkbox"
-                          style={{ width: "20px", height: "20px", accentColor: "var(--color-ink)" }}
-                          checked={field.required}
-                          onChange={(event) => updateField(field.id, "required", event.target.checked)}
-                        />
-                      </td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", gap: "6px" }}>
-                          <button
+            <section className="mt-8">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="size-7 rounded-full bg-[var(--color-ink)] text-white grid place-items-center text-xs font-bold shrink-0">
+                    2
+                  </span>
+                  <h4 className="m-0 text-sm font-semibold">Field Configuration</h4>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="font-bold shrink-0"
+                  onClick={addField}
+                >
+                  <svg viewBox="0 0 24 24" fill="none" className="size-4">
+                    <line x1="12" y1="5" x2="12" y2="19" />
+                    <line x1="5" y1="12" x2="19" y2="12" />
+                  </svg>
+                  Add Field
+                </Button>
+              </div>
+
+              <div className="mt-4 border border-[var(--color-border)] rounded-[18px] overflow-hidden bg-white/92 shadow-[0_10px_32px_rgba(28,28,28,0.05)]">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">Source Header</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">Field Name</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">Data Type</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-4 py-2.5">Req.</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fields.map((field) => (
+                      <TableRow key={field.id}>
+                        <TableCell className="px-4 py-2.5">
+                          <Input
+                            value={field.sourceHeader}
+                            onChange={(event) =>
+                              updateField(field.id, "sourceHeader", event.target.value)
+                            }
+                            className="h-auto rounded-[10px] px-3 py-2 font-mono text-[0.9rem]"
+                          />
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5">
+                          <Input
+                            value={field.fieldName}
+                            onChange={(event) => updateField(field.id, "fieldName", event.target.value)}
+                            className="h-auto rounded-[10px] px-3 py-2"
+                          />
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5">
+                          <select
+                            className={cn(
+                              "w-full min-w-0 rounded-[10px] border border-input bg-transparent px-3 py-2 text-sm transition-colors",
+                              "focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none",
+                            )}
+                            value={field.dataType}
+                            onChange={(event) =>
+                              updateField(
+                                field.id,
+                                "dataType",
+                                event.target.value as TemplateField["dataType"],
+                              )
+                            }
+                          >
+                            {dataTypeOptions.map((option) => (
+                              <option key={option} value={option}>
+                                {option}
+                              </option>
+                            ))}
+                          </select>
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5 text-center">
+                          <input
+                            type="checkbox"
+                            className="size-5 accent-[var(--color-ink)]"
+                            checked={field.required}
+                            onChange={(event) => updateField(field.id, "required", event.target.checked)}
+                          />
+                        </TableCell>
+                        <TableCell className="px-4 py-2.5">
+                          <Button
                             type="button"
+                            variant="ghost"
+                            size="icon"
                             aria-label={`Delete ${field.fieldName}`}
                             onClick={() => removeField(field.id)}
-                            style={{
-                              border: 0,
-                              background: "transparent",
-                              cursor: "pointer",
-                              color: "#ba1a1a",
-                              display: "grid",
-                              placeItems: "center",
-                              padding: "6px",
-                            }}
+                            className="text-[#ba1a1a]"
                           >
                             <svg
                               viewBox="0 0 24 24"
                               fill="none"
-                              width="18"
-                              height="18"
+                              className="size-[18px]"
                               stroke="currentColor"
                               strokeWidth="1.8"
                               strokeLinecap="round"
@@ -614,194 +466,105 @@ export function CreateTemplateModal({
                               <path d="M10 11v6" />
                               <path d="M14 11v6" />
                             </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </section>
+          </div>
+
+          <aside
+            className="min-h-0 overflow-auto px-7 py-5 bg-[rgba(252,251,248,0.98)] border-l border-[var(--color-border)] grid content-start gap-4"
+          >
+            <div className="flex items-center gap-2 font-bold">
+              <svg viewBox="0 0 24 24" fill="none" className="size-5">
+                <path d="m8 9-3 3 3 3" />
+                <path d="m16 9 3 3-3 3" />
+              </svg>
+              <h4 className="m-0 text-sm">Schema Preview</h4>
             </div>
-          </section>
-        </div>
 
-        <aside
-          style={{
-            minHeight: 0,
-            overflow: "auto",
-            padding: "24px 28px",
-            background: "rgba(252, 251, 248, 0.98)",
-            borderLeft: "1px solid var(--color-border)",
-            display: "grid",
-            alignContent: "start",
-            gap: "18px",
-          }}
-        >
-          <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700 }}>
-            <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
-              <path d="m8 9-3 3 3 3" />
-              <path d="m16 9 3 3-3 3" />
-            </svg>
-            <h4 style={{ margin: 0 }}>Schema Preview</h4>
-          </div>
-
-          <div
-            style={{
-              position: "relative",
-              padding: "22px 22px 24px",
-              borderRadius: "16px",
-              background: "rgba(247, 244, 237, 0.9)",
-              border: "1px solid var(--color-border)",
-              color: "var(--color-ink)",
-              overflow: "auto",
-            }}
-          >
-            <span
-              style={{
-                position: "absolute",
-                top: "12px",
-                right: "12px",
-                background: "rgba(28, 28, 28, 0.04)",
-                padding: "4px 10px",
-                borderRadius: "6px",
-                fontSize: "0.75rem",
-                fontWeight: 700,
-                letterSpacing: "0.05em",
-                color: "var(--color-ink)",
-              }}
-            >
-              JSON
-            </span>
-            <pre
-              style={{
-                margin: 0,
-                paddingTop: "28px",
-                fontSize: "0.85rem",
-                lineHeight: 1.7,
-                color: "var(--color-ink)",
-                whiteSpace: "pre",
-                overflow: "auto",
-                maxHeight: "100%",
-              }}
-            >
-              {schemaPreview}
-            </pre>
-          </div>
-
-          <div
-            style={{
-              padding: "14px 16px",
-              border: "1px solid rgba(236, 234, 228, 0.98)",
-              borderRadius: "14px",
-              background: "rgba(255, 255, 255, 0.58)",
-              color: "#6f726f",
-              lineHeight: 1.45,
-              fontSize: "0.82rem",
-            }}
-          >
-            <strong>Tip:</strong> Use dot notation for nested fields like user.address.
-          </div>
-
-          {error ? (
             <div
-              style={{
-                padding: "14px 16px",
-                border: "1px solid rgba(185, 28, 28, 0.18)",
-                borderRadius: "14px",
-                background: "rgba(254, 242, 242, 0.72)",
-                color: "#991b1b",
-                lineHeight: 1.45,
-                fontSize: "0.82rem",
-              }}
+              className="relative p-4 rounded-[16px] bg-[rgba(247,244,237,0.9)] border border-[var(--color-border)] text-[var(--color-ink)] overflow-auto"
             >
-              {error}
+              <span
+                className="absolute top-3 right-3 bg-[rgba(28,28,28,0.04)] px-[10px] py-1 rounded-[6px] text-[0.75rem] font-bold tracking-[0.05em] text-[var(--color-ink)]"
+              >
+                JSON
+              </span>
+              <pre
+                className="m-0 pt-7 text-[0.82rem] leading-[1.6] text-[var(--color-ink)] whitespace-pre overflow-auto max-h-full"
+              >
+                {schemaPreview}
+              </pre>
             </div>
-          ) : null}
-        </aside>
-      </div>
 
-      <footer
-        style={{
-          padding: "18px 32px",
-          background: "rgba(255, 255, 255, 0.66)",
-          display: "flex",
-          justifyContent: "space-between",
-          gap: "16px",
-          alignItems: "center",
-          borderTop: "1px solid var(--color-border)",
-        }}
-      >
-        <button
-          type="button"
-          style={{
-            minHeight: "48px",
-            display: "inline-flex",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: 0,
-            border: 0,
-            background: "transparent",
-            color: "#6f726f",
-            cursor: "pointer",
-          }}
-          onClick={() => {
-            setTemplateName(DEFAULT_TEMPLATE_NAME);
-            setTemplateDescription(DEFAULT_TEMPLATE_DESCRIPTION);
-            setFields(initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : []);
-            setError(null);
-          }}
-        >
-          Reset Changes
-        </button>
-        <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-          <button
-            type="button"
-            style={{
-              minHeight: "48px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "0 24px",
-              borderRadius: "12px",
-              border: "1px solid rgba(224, 220, 214, 0.96)",
-              background: "rgba(255, 255, 255, 0.9)",
-              color: "var(--color-ink)",
-              cursor: "pointer",
-            }}
-            onClick={onClose}
-            disabled={saving}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            style={{
-              minHeight: "48px",
-              display: "inline-flex",
-              alignItems: "center",
-              justifyContent: "center",
-              padding: "0 24px",
-              borderRadius: "12px",
-              border: 0,
-              background: "var(--color-ink)",
-              color: "#fff",
-              fontWeight: 700,
-              cursor: "pointer",
-              opacity: saving ? 0.8 : 1,
-            }}
-            onClick={() => void handleSave()}
-            disabled={saving}
-          >
-            {saving
-              ? initialTemplate
-                ? "Updating Template..."
-                : "Saving Template..."
-              : initialTemplate
-                ? "Update Template"
-                : "Save Template"}
-          </button>
+            <div
+              className="p-3.5 border border-[rgba(236,234,228,0.98)] rounded-[14px] bg-white/58 text-[#6f726f] leading-snug text-[0.8rem]"
+            >
+              <strong>Tip:</strong> Use dot notation for nested fields like user.address.
+            </div>
+
+            {error ? (
+              <div
+                className="p-3.5 border border-[rgba(185,28,28,0.18)] rounded-[14px] bg-[rgba(254,242,242,0.72)] text-[#991b1b] leading-snug text-[0.8rem]"
+              >
+                {error}
+              </div>
+            ) : null}
+          </aside>
         </div>
-      </footer>
-    </Modal>
+
+        <DialogFooter
+          showCloseButton={false}
+          className="mx-0 mb-0 px-8 pt-5 pb-7 bg-white/66 border-t border-[var(--color-border)] rounded-b-[22px] flex items-center justify-between"
+        >
+          <Button
+            type="button"
+            variant="ghost"
+            className="text-[#6f726f]"
+            onClick={() => {
+              setTemplateName(DEFAULT_TEMPLATE_NAME);
+              setTemplateDescription(DEFAULT_TEMPLATE_DESCRIPTION);
+              setFields(initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : []);
+              setError(null);
+            }}
+          >
+            Reset Changes
+          </Button>
+          <div className="flex gap-4 items-center pr-2">
+            <DialogClose
+              render={
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={saving}
+                  className="px-6 py-3"
+                />
+              }
+            >
+              Cancel
+            </DialogClose>
+            <Button
+              type="button"
+              disabled={saving}
+              onClick={() => void handleSave()}
+              className="px-6 py-3"
+            >
+              {saving
+                ? initialTemplate
+                  ? "Updating Template..."
+                  : "Saving Template..."
+                : initialTemplate
+                  ? "Update Template"
+                  : "Save Template"}
+            </Button>
+          </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
