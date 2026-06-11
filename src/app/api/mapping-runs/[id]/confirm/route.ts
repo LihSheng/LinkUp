@@ -27,17 +27,6 @@ export async function POST(request: Request, context: RouteContext) {
     },
   });
 
-  await prisma.mappingTemplate.create({
-    data: {
-      schemaTemplateId: run.schemaTemplateId,
-      name: `${run.sourceSheetName ?? "Sheet"} mapping`,
-      sourceSignature: JSON.stringify(
-        ((run.columnProfiles as Array<{ name: string }>) ?? []).map((column) => column.name),
-      ),
-      confirmedMapping: payload as Prisma.InputJsonValue,
-    },
-  });
-
   return NextResponse.json({
     run: {
       ...updated,

@@ -19,3 +19,20 @@ export async function createSchemaTemplate(input: {
     },
   });
 }
+
+export async function updateSchemaTemplate(
+  templateId: string,
+  input: {
+    name: string;
+    description?: string;
+    jsonSchema: unknown;
+  },
+) {
+  return prisma.schemaTemplate.update({
+    where: { id: templateId },
+    data: {
+      ...input,
+      jsonSchema: input.jsonSchema as Prisma.InputJsonValue,
+    },
+  });
+}

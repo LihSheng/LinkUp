@@ -1,7 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
+
 import { Modal } from "@/components/Modal";
+import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
 export type TemplateField = {
   id: string;
@@ -11,55 +13,157 @@ export type TemplateField = {
   required: boolean;
 };
 
-const DEFAULT_TEMPLATE_NAME = "Custom template";
-const DEFAULT_TEMPLATE_DESCRIPTION = "Define fields and schema for your mapping project";
-const DEFAULT_TEMPLATE_FIELDS: TemplateField[] = [
-  {
-    id: "first-name",
-    sourceHeader: "first_name",
-    fieldName: "FirstName",
-    dataType: "String",
-    required: true,
-  },
-  {
-    id: "user-id",
-    sourceHeader: "user_id",
-    fieldName: "UserID",
-    dataType: "Number",
-    required: true,
-  },
-  {
-    id: "last-updated",
-    sourceHeader: "last_updated",
-    fieldName: "LastUpdate",
-    dataType: "Date",
-    required: false,
-  },
-  {
-    id: "metadata",
-    sourceHeader: "metadata",
-    fieldName: "Metadata",
-    dataType: "Object",
-    required: false,
-  },
-];
+type CreateSchemaTemplatePayload = {
+  name: string;
+  description?: string;
+  jsonSchema: unknown;
+};
+
+export type SchemaTemplateDraft = {
+  id: string;
+  name: string;
+  description?: string | null;
+  jsonSchema: unknown;
+};
 
 type CreateTemplateModalProps = {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void;
+  onCreateTemplate: (payload: CreateSchemaTemplatePayload) => Promise<void>;
+  initialTemplate?: SchemaTemplateDraft | null;
 };
 
-export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateModalProps) {
-  const [templateName, setTemplateName] = useState(DEFAULT_TEMPLATE_NAME);
-  const [templateDescription, setTemplateDescription] = useState(DEFAULT_TEMPLATE_DESCRIPTION);
-  const [fields, setFields] = useState<TemplateField[]>(DEFAULT_TEMPLATE_FIELDS);
+const DEFAULT_TEMPLATE_NAME = "Custom template";
+const DEFAULT_TEMPLATE_DESCRIPTION = "Define fields and schema for your mapping project";
 
-  function resetDraft() {
-    setTemplateName(DEFAULT_TEMPLATE_NAME);
-    setTemplateDescription(DEFAULT_TEMPLATE_DESCRIPTION);
-    setFields(DEFAULT_TEMPLATE_FIELDS);
+function cloneDefaultFields() {
+  return [];
+}
+
+function fieldFromTargetPath(path: string, type: string, required: boolean): TemplateField {
+  const normalizedType =
+    type === "number"
+      ? "Number"
+      : type === "boolean"
+        ? "Boolean"
+        : type === "object" || type.endsWith("[]")
+          ? "Object"
+          : "String";
+
+  return {
+    id: path,
+    sourceHeader: path,
+    fieldName: path,
+    dataType: normalizedType,
+    required,
+  };
+}
+
+function fieldsFromSchema(schema: unknown) {
+  return flattenJsonSchema(schema).map((field) =>
+    fieldFromTargetPath(field.path, field.type, field.required),
+  );
+}
+
+function jsonTypeFor(dataType: TemplateField["dataType"]) {
+  switch (dataType) {
+    case "String":
+    case "Date":
+      return "string";
+    case "Number":
+      return "number";
+    case "Boolean":
+      return "boolean";
+    case "Object":
+      return "object";
+    default:
+      return "string";
   }
+}
+
+function createObjectSchema() {
+  return {
+    type: "object",
+    properties: {} as Record<string, unknown>,
+  };
+}
+
+function buildSchemaFromFields(fields: TemplateField[]) {
+  const root = createObjectSchema() as {
+    type: "object";
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+
+  for (const field of fields) {
+    const segments = field.fieldName
+      .split(".")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+    if (segments.length === 0) {
+      continue;
+    }
+
+    let cursor = root;
+
+    for (let index = 0; index < segments.length; index += 1) {
+      const segment = segments[index];
+      const isLeaf = index === segments.length - 1;
+
+      if (isLeaf) {
+        cursor.properties[segment] =
+          field.dataType === "Object"
+            ? createObjectSchema()
+            : { type: jsonTypeFor(field.dataType) };
+
+        if (field.required) {
+          cursor.required ??= [];
+          if (!cursor.required.includes(segment)) {
+            cursor.required.push(segment);
+          }
+        }
+        continue;
+      }
+
+      const nextValue = cursor.properties[segment];
+      const nextSchema =
+        nextValue && typeof nextValue === "object" && !Array.isArray(nextValue)
+          ? (nextValue as {
+              type?: string;
+              properties?: Record<string, unknown>;
+              required?: string[];
+            })
+          : createObjectSchema();
+
+      nextSchema.type = "object";
+      nextSchema.properties ??= {};
+      cursor.properties[segment] = nextSchema;
+      cursor = nextSchema;
+    }
+  }
+
+  return root;
+}
+
+export function CreateTemplateModal({
+  isOpen,
+  onClose,
+  onCreateTemplate,
+  initialTemplate,
+}: CreateTemplateModalProps) {
+  const [templateName, setTemplateName] = useState(
+    initialTemplate?.name ?? DEFAULT_TEMPLATE_NAME,
+  );
+  const [templateDescription, setTemplateDescription] = useState(
+    initialTemplate?.description ?? DEFAULT_TEMPLATE_DESCRIPTION,
+  );
+  const [fields, setFields] = useState<TemplateField[]>(
+    initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : cloneDefaultFields(),
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   function updateField<K extends keyof TemplateField>(
     fieldId: string,
@@ -89,12 +193,34 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
     setFields((current) => current.filter((field) => field.id !== fieldId));
   }
 
-  const schemaPreview = `{\n${fields
-    .map(
-      (field, index) =>
-        `  "${field.fieldName}": "${field.dataType}"${index === fields.length - 1 ? "" : ","}`,
-    )
-    .join("\n")}\n}`;
+  const schemaPreview = JSON.stringify(buildSchemaFromFields(fields), null, 2);
+
+  async function handleSave() {
+    const name = templateName.trim();
+
+    if (!name) {
+      setError("Template name is required.");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+
+    try {
+      await onCreateTemplate({
+        name,
+        description: templateDescription.trim() || undefined,
+        jsonSchema: buildSchemaFromFields(fields),
+      });
+      onClose();
+    } catch (caughtError) {
+      setError(
+        caughtError instanceof Error ? caughtError.message : "Unable to create schema template.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <Modal isOpen={isOpen} onClose={onClose}>
@@ -111,7 +237,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
       >
         <div style={{ minWidth: 0 }}>
           <h3 id="template-modal-title" style={{ margin: 0, fontSize: "1.05rem", lineHeight: 1.2 }}>
-            Create Custom Template
+            {initialTemplate ? "Edit Saved Template" : "Create Custom Template"}
           </h3>
           <p style={{ margin: "4px 0 0", fontSize: "0.92rem", lineHeight: 1.45 }}>
             {templateDescription}
@@ -222,7 +348,15 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               <h4 style={{ margin: 0 }}>Upload Sample</h4>
             </div>
 
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv,.xlsx"
+              style={{ display: "none" }}
+            />
             <div
+              role="button"
+              tabIndex={0}
               style={{
                 marginTop: "18px",
                 padding: "24px",
@@ -233,6 +367,13 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                 display: "flex",
                 alignItems: "center",
                 gap: "20px",
+                cursor: "pointer",
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  fileInputRef.current?.click();
+                }
               }}
             >
               <div
@@ -245,10 +386,10 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                   flex: "0 0 auto",
                   background: "rgba(255, 255, 255, 0.92)",
                   border: "1px solid rgba(236, 234, 228, 0.92)",
-                  color: "#767a79",
+                  color: "var(--color-ink)",
                 }}
               >
-                <svg viewBox="0 0 24 24" fill="none" width="20" height="20">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
                   <path d="M7 18a4 4 0 0 1-.4-7.98A5.5 5.5 0 0 1 17 8.5h.5a3.5 3.5 0 1 1 0 7H7Z" />
                   <path d="M12 8v8" />
                   <path d="m8.5 11.5 3.5-3.5 3.5 3.5" />
@@ -311,6 +452,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               </div>
               <button
                 type="button"
+                className="template-modal-add"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -321,6 +463,9 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                   fontWeight: 700,
                   fontSize: "1rem",
                   cursor: "pointer",
+                  whiteSpace: "nowrap",
+                  flexWrap: "nowrap",
+                  minWidth: "max-content",
                 }}
                 onClick={addField}
               >
@@ -328,7 +473,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                   <line x1="12" y1="5" x2="12" y2="19" />
                   <line x1="5" y1="12" x2="19" y2="12" />
                 </svg>
-                Add Field
+                <span>Add Field</span>
               </button>
             </div>
 
@@ -345,18 +490,27 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr>
-                    <th>Source Header</th>
-                    <th>Field Name</th>
-                    <th>Data Type</th>
-                    <th>Req.</th>
-                    <th>Actions</th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
+                      Source Header
+                    </th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
+                      Field Name
+                    </th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
+                      Data Type
+                    </th>
+                    <th style={{ padding: "12px 16px", textAlign: "center", whiteSpace: "nowrap" }}>
+                      Req.
+                    </th>
+                    <th style={{ padding: "12px 16px", textAlign: "left", whiteSpace: "nowrap" }}>
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {fields.map((field) => (
                     <tr key={field.id}>
-                      <td style={{ fontFamily: "monospace" }}>{field.sourceHeader}</td>
-                      <td>
+                      <td style={{ padding: "12px 16px" }}>
                         <input
                           style={{
                             width: "100%",
@@ -366,14 +520,33 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                             borderRadius: "10px",
                             background: "rgba(252, 251, 248, 0.98)",
                             color: "var(--color-ink)",
+                            boxSizing: "border-box",
+                            fontFamily: "monospace",
+                            fontSize: "0.9rem",
                           }}
-                          value={field.fieldName}
+                          value={field.sourceHeader}
                           onChange={(event) =>
-                            updateField(field.id, "fieldName", event.target.value)
+                            updateField(field.id, "sourceHeader", event.target.value)
                           }
                         />
                       </td>
-                      <td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <input
+                          style={{
+                            width: "100%",
+                            minWidth: 0,
+                            padding: "11px 12px",
+                            border: "1px solid rgba(224, 220, 214, 0.96)",
+                            borderRadius: "10px",
+                            background: "rgba(252, 251, 248, 0.98)",
+                            color: "var(--color-ink)",
+                            boxSizing: "border-box",
+                          }}
+                          value={field.fieldName}
+                          onChange={(event) => updateField(field.id, "fieldName", event.target.value)}
+                        />
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
                         <select
                           style={{
                             width: "100%",
@@ -383,6 +556,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                             borderRadius: "10px",
                             background: "rgba(252, 251, 248, 0.98)",
                             color: "var(--color-ink)",
+                            boxSizing: "border-box",
                           }}
                           value={field.dataType}
                           onChange={(event) =>
@@ -400,36 +574,16 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                           <option value="Object">Object</option>
                         </select>
                       </td>
-                      <td style={{ textAlign: "center" }}>
+                      <td style={{ padding: "12px 16px", textAlign: "center" }}>
                         <input
                           type="checkbox"
                           style={{ width: "20px", height: "20px", accentColor: "var(--color-ink)" }}
                           checked={field.required}
-                          onChange={(event) =>
-                            updateField(field.id, "required", event.target.checked)
-                          }
+                          onChange={(event) => updateField(field.id, "required", event.target.checked)}
                         />
                       </td>
-                      <td>
+                      <td style={{ padding: "12px 16px" }}>
                         <div style={{ display: "flex", gap: "6px" }}>
-                          <button
-                            type="button"
-                            aria-label={`Edit ${field.fieldName}`}
-                            style={{
-                              border: 0,
-                              background: "transparent",
-                              cursor: "pointer",
-                              color: "var(--color-ink)",
-                              display: "grid",
-                              placeItems: "center",
-                              padding: "6px",
-                            }}
-                          >
-                            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
-                              <path d="M12 20h9" />
-                              <path d="M16.5 3.5a2.12 2.12 0 1 1 3 3L7 19l-4 1 1-4Z" />
-                            </svg>
-                          </button>
                           <button
                             type="button"
                             aria-label={`Delete ${field.fieldName}`}
@@ -438,13 +592,22 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                               border: 0,
                               background: "transparent",
                               cursor: "pointer",
-                              color: "var(--color-ink)",
+                              color: "#ba1a1a",
                               display: "grid",
                               placeItems: "center",
                               padding: "6px",
                             }}
                           >
-                            <svg viewBox="0 0 24 24" fill="none" width="18" height="18">
+                            <svg
+                              viewBox="0 0 24 24"
+                              fill="none"
+                              width="18"
+                              height="18"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               <path d="M3 6h18" />
                               <path d="M8 6V4h8v2" />
                               <path d="M19 6l-1 14H6L5 6" />
@@ -465,14 +628,13 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
         <aside
           style={{
             minHeight: 0,
-            overflowY: "auto",
-            padding: "28px 32px",
-            background:
-              "linear-gradient(180deg, rgba(242, 238, 236, 0.96), rgba(234, 229, 226, 0.98))",
+            overflow: "auto",
+            padding: "24px 28px",
+            background: "rgba(252, 251, 248, 0.98)",
             borderLeft: "1px solid var(--color-border)",
             display: "grid",
             alignContent: "start",
-            gap: "24px",
+            gap: "18px",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", gap: "8px", fontWeight: 700 }}>
@@ -486,14 +648,12 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
           <div
             style={{
               position: "relative",
-              minHeight: "560px",
-              padding: "28px 28px 32px",
+              padding: "22px 22px 24px",
               borderRadius: "16px",
-              background:
-                "radial-gradient(circle at 1px 1px, rgba(255, 255, 255, 0.06) 1px, transparent 0), #1e1d1c",
-              backgroundSize: "22px 22px, auto",
-              color: "#f7f2df",
-              overflow: "hidden",
+              background: "rgba(247, 244, 237, 0.9)",
+              border: "1px solid var(--color-border)",
+              color: "var(--color-ink)",
+              overflow: "auto",
             }}
           >
             <span
@@ -501,32 +661,62 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
                 position: "absolute",
                 top: "12px",
                 right: "12px",
-                background: "rgba(255, 255, 255, 0.1)",
+                background: "rgba(28, 28, 28, 0.04)",
                 padding: "4px 10px",
                 borderRadius: "6px",
                 fontSize: "0.75rem",
                 fontWeight: 700,
                 letterSpacing: "0.05em",
+                color: "var(--color-ink)",
               }}
             >
               JSON
             </span>
-            <pre style={{ margin: 0, fontSize: "0.85rem", lineHeight: 1.7 }}>{schemaPreview}</pre>
+            <pre
+              style={{
+                margin: 0,
+                paddingTop: "28px",
+                fontSize: "0.85rem",
+                lineHeight: 1.7,
+                color: "var(--color-ink)",
+                whiteSpace: "pre",
+                overflow: "auto",
+                maxHeight: "100%",
+              }}
+            >
+              {schemaPreview}
+            </pre>
           </div>
 
           <div
             style={{
-              padding: "20px",
+              padding: "14px 16px",
               border: "1px solid rgba(236, 234, 228, 0.98)",
               borderRadius: "14px",
               background: "rgba(255, 255, 255, 0.58)",
               color: "#6f726f",
-              lineHeight: 1.6,
-              fontSize: "0.9rem",
+              lineHeight: 1.45,
+              fontSize: "0.82rem",
             }}
           >
-            <strong>PRO TIP:</strong> Objects can be nested using dot notation (e.g., user.address).
+            <strong>Tip:</strong> Use dot notation for nested fields like user.address.
           </div>
+
+          {error ? (
+            <div
+              style={{
+                padding: "14px 16px",
+                border: "1px solid rgba(185, 28, 28, 0.18)",
+                borderRadius: "14px",
+                background: "rgba(254, 242, 242, 0.72)",
+                color: "#991b1b",
+                lineHeight: 1.45,
+                fontSize: "0.82rem",
+              }}
+            >
+              {error}
+            </div>
+          ) : null}
         </aside>
       </div>
 
@@ -554,7 +744,12 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
             color: "#6f726f",
             cursor: "pointer",
           }}
-          onClick={resetDraft}
+          onClick={() => {
+            setTemplateName(DEFAULT_TEMPLATE_NAME);
+            setTemplateDescription(DEFAULT_TEMPLATE_DESCRIPTION);
+            setFields(initialTemplate ? fieldsFromSchema(initialTemplate.jsonSchema) : []);
+            setError(null);
+          }}
         >
           Reset Changes
         </button>
@@ -574,6 +769,7 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               cursor: "pointer",
             }}
             onClick={onClose}
+            disabled={saving}
           >
             Cancel
           </button>
@@ -591,10 +787,18 @@ export function CreateTemplateModal({ isOpen, onClose, onSave }: CreateTemplateM
               color: "#fff",
               fontWeight: 700,
               cursor: "pointer",
+              opacity: saving ? 0.8 : 1,
             }}
-            onClick={onSave}
+            onClick={() => void handleSave()}
+            disabled={saving}
           >
-            Save Template
+            {saving
+              ? initialTemplate
+                ? "Updating Template..."
+                : "Saving Template..."
+              : initialTemplate
+                ? "Update Template"
+                : "Save Template"}
           </button>
         </div>
       </footer>

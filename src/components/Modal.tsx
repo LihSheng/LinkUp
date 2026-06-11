@@ -14,7 +14,9 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
     if (!isOpen) return;
 
     const previousOverflow = document.body.style.overflow;
+    const previousHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") onClose();
@@ -24,6 +26,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
 
     return () => {
       document.body.style.overflow = previousOverflow;
+      document.documentElement.style.overflow = previousHtmlOverflow;
       window.removeEventListener("keydown", handleKeyDown);
     };
   }, [isOpen, onClose]);
@@ -38,7 +41,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
         zIndex: 9999,
         display: "grid",
         placeItems: "center",
-        padding: "24px",
+        padding: "16px",
         background: "rgba(28, 28, 28, 0.18)",
         backdropFilter: "blur(8px)",
       }}
@@ -50,7 +53,7 @@ export function Modal({ isOpen, onClose, children }: ModalProps) {
       <div
         style={{
           width: "min(1280px, calc(100vw - 48px))",
-          maxHeight: "calc(100vh - 48px)",
+          maxHeight: "calc(100vh - 32px)",
           display: "flex",
           flexDirection: "column",
           background: "rgba(252, 251, 248, 0.98)",

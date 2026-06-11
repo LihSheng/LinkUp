@@ -6,14 +6,15 @@ import { usePathname } from "next/navigation";
 import clsx from "clsx";
 
 const steps = [
-  { href: "/wizard/schema", label: "Template", number: "01" },
-  { href: "/wizard/workbook", label: "Workbook", number: "02" },
-  { href: "/wizard/mapping", label: "Mapping", number: "03" },
-  { href: "/wizard/output", label: "Output", number: "04" },
+  { href: "/wizard/schema", label: "Template", number: "01", title: "Schema templates" },
+  { href: "/wizard/workbook", label: "Workbook", number: "02", title: "Upload workbook" },
+  { href: "/wizard/mapping", label: "Mapping", number: "03", title: "Review mapping" },
+  { href: "/wizard/output", label: "Output", number: "04", title: "Output preview" },
 ] as const;
 
 export function WizardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
 
   return (
     <div className="workspace-shell wizard-shell-frame">
@@ -25,11 +26,6 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
             <span>Wizard flow</span>
           </span>
         </Link>
-
-        <div className="wizard-progress-card">
-          <p className="dashboard-card-kicker">Sequence</p>
-          <p>Four pages for one mapping journey, with the old monolith still available in the lab.</p>
-        </div>
 
         <nav className="wizard-step-nav" aria-label="Wizard steps">
           {steps.map((step) => {
@@ -65,14 +61,11 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
         <header className="wizard-topbar">
           <div>
             <p className="dashboard-kicker">Wizard</p>
-            <h1>Schema matching flow</h1>
+            <h1>{activeStep.title}</h1>
           </div>
           <div className="wizard-topbar-actions">
             <Link href="/" className="ghost-button">
               Back to dashboard
-            </Link>
-            <Link href="/studio" className="primary-button">
-              Open lab
             </Link>
           </div>
         </header>
