@@ -1,6 +1,21 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import { WizardStepPage } from "@/components/wizard/WizardStepPage";
+import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 
 export default function WorkbookStepPage() {
+  const router = useRouter();
+  const { completeStep, isStepAccessible } = useWizardProgress();
+
+  useEffect(() => {
+    if (!isStepAccessible(1)) {
+      router.replace("/wizard/schema");
+    }
+  }, [isStepAccessible, router]);
+
   return (
     <WizardStepPage
       step="Step 2"
@@ -16,6 +31,10 @@ export default function WorkbookStepPage() {
         { label: "Samples", value: "20" },
         { label: "Columns", value: "8" },
       ]}
+      onContinue={() => {
+        completeStep(1);
+        router.push("/wizard/mapping");
+      }}
     >
       <div className="wizard-placeholder">
         <strong>Workbook upload placeholder</strong>

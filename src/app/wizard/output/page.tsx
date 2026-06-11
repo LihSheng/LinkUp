@@ -1,6 +1,21 @@
+"use client";
+
+import { useEffect } from "react";
+import { useRouter } from "next/navigation";
+
 import { WizardStepPage } from "@/components/wizard/WizardStepPage";
+import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 
 export default function OutputStepPage() {
+  const router = useRouter();
+  const { completeStep, isStepAccessible } = useWizardProgress();
+
+  useEffect(() => {
+    if (!isStepAccessible(3)) {
+      router.replace("/wizard/schema");
+    }
+  }, [isStepAccessible, router]);
+
   return (
     <WizardStepPage
       step="Step 4"
@@ -16,6 +31,10 @@ export default function OutputStepPage() {
         { label: "Warnings", value: "0" },
         { label: "Errors", value: "0" },
       ]}
+      onContinue={() => {
+        completeStep(3);
+        router.push("/wizard/schema");
+      }}
     >
       <div className="wizard-placeholder">
         <strong>Output preview placeholder</strong>

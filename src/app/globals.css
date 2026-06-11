@@ -1892,6 +1892,13 @@ summary::-webkit-details-marker {
   margin-top: 4px;
 }
 
+.wizard-step-item.is-disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  pointer-events: none;
+  user-select: none;
+}
+
 .wizard-progress-card {
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);

@@ -1,8 +1,22 @@
+"use client";
+
+import { useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 import { WizardStepPage } from "@/components/wizard/WizardStepPage";
+import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 
 export default function MappingStepPage() {
+  const router = useRouter();
+  const { completeStep, isStepAccessible } = useWizardProgress();
+
+  useEffect(() => {
+    if (!isStepAccessible(2)) {
+      router.replace("/wizard/schema");
+    }
+  }, [isStepAccessible, router]);
+
   return (
     <WizardStepPage
       step="Step 3"
@@ -18,6 +32,10 @@ export default function MappingStepPage() {
         { label: "Review", value: "0" },
         { label: "Duplicates", value: "0" },
       ]}
+      onContinue={() => {
+        completeStep(2);
+        router.push("/wizard/output");
+      }}
     >
       <div className="wizard-placeholder">
         <strong>Mapping workspace placeholder</strong>

@@ -1,3 +1,4 @@
+import { WizardProgressProvider } from "@/components/wizard/WizardProgressContext";
 import { WizardShell } from "@/components/wizard/WizardShell";
 
 export default function WizardLayout({
@@ -5,5 +6,9 @@ export default function WizardLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return <WizardShell>{children}</WizardShell>;
+  return (
+    <WizardProgressProvider>
+      <WizardShell>{children}</WizardShell>
+    </WizardProgressProvider>
+  );
 }

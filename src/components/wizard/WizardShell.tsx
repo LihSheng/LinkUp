@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 
 import clsx from "clsx";
 
+import { useWizardProgress } from "./WizardProgressContext";
+
 const steps = [
   { href: "/wizard/schema", label: "Template", number: "01", title: "Schema templates" },
   { href: "/wizard/workbook", label: "Workbook", number: "02", title: "Upload workbook" },
@@ -15,6 +17,7 @@ const steps = [
 export function WizardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
+  const { isStepAccessible } = useWizardProgress();
 
   return (
     <div className="workspace-shell wizard-shell-frame">
@@ -28,8 +31,25 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
         </Link>
 
         <nav className="wizard-step-nav" aria-label="Wizard steps">
-          {steps.map((step) => {
+          {steps.map((step, index) => {
             const active = pathname === step.href;
+            const accessible = isStepAccessible(index);
+
+            if (!accessible) {
+              return (
+                <span
+                  key={step.href}
+                  className={clsx("wizard-step-item", "is-disabled")}
+                  aria-disabled="true"
+                >
+                  <span className="wizard-step-number">{step.number}</span>
+                  <span>
+                    <strong>{step.label}</strong>
+                    <span>{step.href.replace("/wizard/", "")}</span>
+                  </span>
+                </span>
+              );
+            }
 
             return (
               <Link

@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import useSWR from "swr";
 
@@ -25,6 +25,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
+import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
 import { CreateTemplateModal } from "./CreateTemplateModal";
@@ -70,6 +71,8 @@ async function readJson<T>(response: Response): Promise<T> {
 const swrFetcher = async (url: string) => readJson<TemplateListResponse>(await fetch(url));
 
 export default function SchemaStepPage() {
+  const router = useRouter();
+  const { completeStep } = useWizardProgress();
   const [selected, setSelected] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectedTemplateId, setInspectedTemplateId] = useState<string | null>(null);
@@ -84,7 +87,7 @@ export default function SchemaStepPage() {
   const templates = useMemo(() => data?.templates ?? [], [data?.templates]);
   const selectedTemplate = selected
     ? templates.find((template) => template.id === selected) ?? null
-    : templates[0] ?? null;
+    : null;
   const inspectedTemplate = useMemo(
     () => templates.find((template) => template.id === inspectedTemplateId) ?? null,
     [inspectedTemplateId, templates],
@@ -327,17 +330,22 @@ export default function SchemaStepPage() {
               : "Select a schema template to continue"}
           </p>
         </div>
-        <Link
-          href="/wizard/workbook"
+        <button
+          type="button"
           className="primary-button"
-          aria-disabled={!selectedTemplate}
-          style={{
-            pointerEvents: selectedTemplate ? "auto" : "none",
-            opacity: selectedTemplate ? 1 : 0.5,
+          onClick={() => {
+            if (!selectedTemplate) {
+              toast.error("No template selected", {
+                description: "Please select a schema template before continuing.",
+              });
+              return;
+            }
+            completeStep(0);
+            router.push("/wizard/workbook");
           }}
         >
-          Continue to Upload
-        </Link>
+          Next
+        </button>
       </div>
 
       {isCreateModalOpen ? (

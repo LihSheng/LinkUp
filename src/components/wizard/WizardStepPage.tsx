@@ -11,6 +11,7 @@ type WizardStepPageProps = {
   secondaryLabel?: string;
   stats: Array<{ label: string; value: string }>;
   children?: React.ReactNode;
+  onContinue?: () => void;
 };
 
 export function WizardStepPage({
@@ -24,6 +25,7 @@ export function WizardStepPage({
   secondaryLabel,
   stats,
   children,
+  onContinue,
 }: WizardStepPageProps) {
   return (
     <div className="wizard-step-page">
@@ -54,9 +56,15 @@ export function WizardStepPage({
       </section>
 
       <section className="wizard-footer">
-        <Link href={primaryHref} className="primary-button">
-          {primaryLabel}
-        </Link>
+        {onContinue ? (
+          <button type="button" className="primary-button" onClick={onContinue}>
+            {primaryLabel}
+          </button>
+        ) : (
+          <Link href={primaryHref} className="primary-button">
+            {primaryLabel}
+          </Link>
+        )}
         {secondaryHref && secondaryLabel ? (
           <Link href={secondaryHref} className="ghost-button">
             {secondaryLabel}
