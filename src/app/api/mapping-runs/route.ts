@@ -5,6 +5,7 @@ import { createRunSchema } from "@/lib/contracts";
 import { previewWorkbook } from "@/lib/excel/excel.service";
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
+import type { CanonicalField } from "@/lib/excel/header-detection";
 
 export async function POST(request: Request) {
   const payload = createRunSchema.parse(await request.json());
@@ -23,10 +24,83 @@ export async function POST(request: Request) {
     );
   }
 
+  const targetFields = flattenJsonSchema(schemaTemplate.jsonSchema);
+
+  let canonicalFields: CanonicalField[] | undefined;
+
+  if (schemaTemplate.canonicalFields) {
+    canonicalFields = schemaTemplate.canonicalFields as CanonicalField[];
+  } else {
+    canonicalFields = targetFields.map((f) => ({
+      path: f.path,
+      type: f.type,
+      required: f.required,
+      description: f.description,
+    }));
+  }
+
   const preview = await previewWorkbook({
     filePath: uploadedFile.storagePath,
     preferredSheetName: payload.sourceSheetName,
+    templateFields: canonicalFields,
   });
+
+  const hasDetection =
+    "detection" in preview && preview.detection !== undefined;
+
+  if (hasDetection) {
+    const detection = preview.detection!;
+
+    if (detection.unmatchedRequiredFields.length > 0) {
+      const missing = detection.unmatchedRequiredFields.map(
+        (f) => f.path,
+      );
+
+      return NextResponse.json(
+        {
+          error: "Required fields are missing from the workbook.",
+          missingRequiredFields: missing,
+          detection: {
+            headerRowIndex: detection.headerRowIndex,
+            matchedFields: detection.matchedFields,
+            confidence: detection.confidence,
+            ambiguous: detection.ambiguous,
+          },
+        },
+        { status: 422 },
+      );
+    }
+
+    if (detection.ambiguous) {
+      const run = await prisma.mappingRun.create({
+        data: {
+          uploadedFileId: uploadedFile.id,
+          schemaTemplateId: schemaTemplate.id,
+          sourceSheetName: preview.sourceSheetName,
+          columnProfiles: preview.columnProfiles as Prisma.InputJsonValue,
+          sampleRows: preview.sampleRows as Prisma.InputJsonValue,
+          status: "profiled",
+        },
+      });
+
+      return NextResponse.json({
+        run: {
+          ...run,
+          targetFields,
+          schemaTemplate,
+          workbookMeta: uploadedFile.workbookMeta,
+        },
+        warning:
+          "Header detection confidence is low. Please verify the detected header row.",
+        detection: {
+          headerRowIndex: detection.headerRowIndex,
+          matchedFields: detection.matchedFields,
+          confidence: detection.confidence,
+          ambiguous: true,
+        },
+      });
+    }
+  }
 
   const run = await prisma.mappingRun.create({
     data: {
@@ -39,12 +113,23 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({
+  const response: Record<string, unknown> = {
     run: {
       ...run,
-      targetFields: flattenJsonSchema(schemaTemplate.jsonSchema),
+      targetFields,
       schemaTemplate,
       workbookMeta: uploadedFile.workbookMeta,
     },
-  });
+  };
+
+  if (hasDetection) {
+    response.detection = {
+      headerRowIndex: preview.detection!.headerRowIndex,
+      matchedFields: preview.detection!.matchedFields,
+      confidence: preview.detection!.confidence,
+      ambiguous: preview.detection!.ambiguous,
+    };
+  }
+
+  return NextResponse.json(response);
 }

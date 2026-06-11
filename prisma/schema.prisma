@@ -8,14 +8,15 @@ datasource db {
 }
 
 model SchemaTemplate {
-  id          String            @id @default(cuid())
-  name        String
-  description String?
-  jsonSchema  Json
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  runs        MappingRun[]
-  templates   MappingTemplate[]
+  id              String            @id @default(cuid())
+  name            String
+  description     String?
+  jsonSchema      Json
+  canonicalFields Json?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  runs            MappingRun[]
+  templates       MappingTemplate[]
 }
 
 model UploadedFile {
