@@ -55,3 +55,38 @@ export async function updateSchemaTemplate(
     },
   });
 }
+
+export async function deleteSchemaTemplate(templateId: string) {
+  const template = await prisma.schemaTemplate.findUnique({
+    where: { id: templateId },
+    select: {
+      id: true,
+      name: true,
+      _count: {
+        select: {
+          runs: true,
+          templates: true,
+        },
+      },
+    },
+  });
+
+  if (!template) {
+    throw new Error("Template not found.");
+  }
+
+  if (template._count.runs > 0 || template._count.templates > 0) {
+    throw new Error(
+      "This template is still used by saved runs or mappings and cannot be deleted.",
+    );
+  }
+
+  await prisma.schemaTemplate.delete({
+    where: { id: templateId },
+  });
+
+  return {
+    id: template.id,
+    name: template.name,
+  };
+}

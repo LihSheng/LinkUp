@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import * as XLSX from "xlsx";
 
 import {
   Dialog,
@@ -22,6 +23,7 @@ import {
   TableCell,
 } from "@/components/ui/table";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
+import { buildTemplateFieldsFromRows } from "@/lib/excel/template-import";
 import { cn } from "@/lib/utils";
 
 export type TemplateField = {
@@ -321,6 +323,46 @@ export function CreateTemplateModal({
                 type="file"
                 accept=".csv,.xlsx"
                 style={{ display: "none" }}
+                onChange={async (event) => {
+                  const file = event.target.files?.[0];
+                  if (!file) return;
+
+                  try {
+                    const data = new Uint8Array(await file.arrayBuffer());
+                    const workbook = XLSX.read(data, { type: "array", raw: false });
+                    const firstSheetName = workbook.SheetNames[0];
+
+                    if (!firstSheetName) {
+                      throw new Error("The workbook does not contain any sheets.");
+                    }
+
+                    const firstSheet = workbook.Sheets[firstSheetName];
+                    const rows = XLSX.utils.sheet_to_json<unknown[]>(firstSheet, {
+                      header: 1,
+                      defval: "",
+                      blankrows: false,
+                    }) as unknown[][];
+
+                    const detectedFields = buildTemplateFieldsFromRows(rows);
+
+                    if (detectedFields.length === 0) {
+                      throw new Error(
+                        "Could not detect a usable header row in the selected file.",
+                      );
+                    }
+
+                    setFields(detectedFields);
+                    setError(null);
+                  } catch (caughtError) {
+                    setError(
+                      caughtError instanceof Error
+                        ? caughtError.message
+                        : "Unable to read the selected spreadsheet.",
+                    );
+                  } finally {
+                    event.target.value = "";
+                  }
+                }}
               />
               <div
                 role="button"
@@ -374,7 +416,15 @@ export function CreateTemplateModal({
                   className="font-bold shrink-0"
                   onClick={addField}
                 >
-                  <svg viewBox="0 0 24 24" fill="none" className="size-4">
+                  <svg
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="size-4"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>

@@ -12,7 +12,19 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import { toast } from "@/components/ui/sonner";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
 import { CreateTemplateModal } from "./CreateTemplateModal";
@@ -62,6 +74,8 @@ export default function SchemaStepPage() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectedTemplateId, setInspectedTemplateId] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<SchemaTemplate | null>(null);
+  const [templatePendingDelete, setTemplatePendingDelete] = useState<SchemaTemplate | null>(null);
+  const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
 
   const { data, mutate, isLoading, error } = useSWR("/api/schema-templates", swrFetcher, {
     revalidateOnFocus: false,
@@ -95,13 +109,19 @@ export default function SchemaStepPage() {
       (current: unknown) => {
         const existing = (current as TemplateListResponse | undefined)?.templates ?? [];
         return {
-          templates: [result.template, ...existing.filter((template) => template.id !== result.template.id)],
+          templates: [
+            result.template,
+            ...existing.filter((template) => template.id !== result.template.id),
+          ],
         };
       },
       { revalidate: false },
     );
 
     setSelected(result.template.id);
+    toast.success("Template created", {
+      description: `"${result.template.name}" was saved.`,
+    });
   }
 
   async function handleUpdateTemplate(
@@ -136,14 +156,75 @@ export default function SchemaStepPage() {
     );
 
     setSelected(result.template.id);
+    toast.success("Template updated", {
+      description: `"${result.template.name}" was updated.`,
+    });
+  }
+
+  async function handleDeleteTemplate(templateId: string) {
+    const result = await readJson<{ template: SchemaTemplate }>(
+      await fetch(`/api/schema-templates/${templateId}`, {
+        method: "DELETE",
+      }),
+    );
+
+    await mutate(
+      (current: unknown) => {
+        const existing = (current as TemplateListResponse | undefined)?.templates ?? [];
+        return {
+          templates: existing.filter((item) => item.id !== templateId),
+        };
+      },
+      { revalidate: false },
+    );
+
+    return result.template;
+  }
+
+  async function handleConfirmDelete() {
+    const template = templatePendingDelete;
+
+    if (!template) {
+      return;
+    }
+
+    setIsDeletingTemplate(true);
+
+    try {
+      const deletedTemplate = await handleDeleteTemplate(template.id);
+
+      if (selected === template.id) {
+        setSelected((current) =>
+          current === template.id
+            ? templates.find((item) => item.id !== template.id)?.id ?? null
+            : current,
+        );
+      }
+
+      setInspectedTemplateId((current) => (current === template.id ? null : current));
+      setEditingTemplate((current) => (current?.id === template.id ? null : current));
+
+      toast.success("Template deleted", {
+        description: `"${deletedTemplate.name}" was deleted.`,
+      });
+    } catch (error) {
+      toast.error("Template not deleted", {
+        description: error instanceof Error ? error.message : "Unable to delete template.",
+      });
+    } finally {
+      setIsDeletingTemplate(false);
+      setTemplatePendingDelete(null);
+    }
   }
 
   return (
     <div className="wizard-step-page">
       <div className="template-grid">
         {isLoading ? (
-          <div className="template-card template-card-new" style={{ cursor: "default" }}>
-            <h3 className="template-card-title">Loading templates</h3>
+          <div className="template-card" style={{ cursor: "default", pointerEvents: "none" }}>
+            <Skeleton className="h-5 w-2/3 bg-muted-foreground/15" />
+            <Skeleton className="h-4 w-full bg-muted-foreground/15" />
+            <Skeleton className="h-4 w-1/2 bg-muted-foreground/15" />
           </div>
         ) : null}
 
@@ -291,9 +372,42 @@ export default function SchemaStepPage() {
             setInspectedTemplateId(null);
             setEditingTemplate(inspectedTemplate);
           }}
+          onDelete={() => setTemplatePendingDelete(inspectedTemplate)}
           onClose={() => setInspectedTemplateId(null)}
         />
       ) : null}
+
+      <AlertDialog
+        open={templatePendingDelete !== null}
+        onOpenChange={(open) => {
+          if (!open && !isDeletingTemplate) {
+            setTemplatePendingDelete(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {templatePendingDelete
+                ? `This will permanently delete "${templatePendingDelete.name}". This cannot be undone.`
+                : "This template will be permanently deleted. This cannot be undone."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeletingTemplate}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              disabled={isDeletingTemplate}
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmDelete();
+              }}
+            >
+              {isDeletingTemplate ? "Deleting..." : "Delete template"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -301,10 +415,12 @@ export default function SchemaStepPage() {
 function TemplateDetailsModal({
   template,
   onEdit,
+  onDelete,
   onClose,
 }: {
   template: SchemaTemplate;
   onEdit: () => void;
+  onDelete: () => void | Promise<void>;
   onClose: () => void;
 }) {
   const fields = flattenJsonSchema(template.jsonSchema);
@@ -330,6 +446,12 @@ function TemplateDetailsModal({
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" onClick={onEdit}>
               Edit template
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={onDelete}
+            >
+              Delete template
             </Button>
             <DialogClose
               render={
