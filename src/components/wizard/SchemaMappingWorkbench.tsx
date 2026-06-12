@@ -191,7 +191,7 @@ export function SchemaMappingWorkbench({ onBack, onComplete }: SchemaMappingWork
         </div>
       ) : null}
 
-      <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)]">
+      <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-transparent">
         <div className="flex flex-col items-center px-10 pb-8 pt-10 text-center">
           <h3 className="m-0 font-[var(--font-display)] text-[clamp(2.8rem,4.6vw,4rem)] font-semibold tracking-[-0.07rem] text-[var(--color-ink)]">
             Mapping Intelligence
@@ -201,7 +201,7 @@ export function SchemaMappingWorkbench({ onBack, onComplete }: SchemaMappingWork
           </p>
         </div>
 
-        <div className="mx-6 mb-2 mt-1 overflow-hidden rounded-[14px] border border-[var(--color-border)] bg-[rgba(247,244,237,0.55)] px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
+        <div className="mx-6 mb-2 mt-1 overflow-hidden rounded-lg border border-[var(--color-border)] bg-[rgba(247,244,237,0.55)] px-6 py-6">
           <div className="flex flex-col gap-4">
             {mappings.map((mapping) => {
               const band = classifyConfidence(mapping.confidence);
@@ -338,7 +338,7 @@ export function SchemaMappingWorkbench({ onBack, onComplete }: SchemaMappingWork
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-[var(--color-border)] bg-transparent px-3.5 text-[0.84rem] font-medium text-[var(--color-ink)] transition-all hover:bg-[var(--color-ink-04)] active:translate-y-px"
+              className="ghost-button"
               onClick={handleBack}
             >
               Back
@@ -360,12 +360,7 @@ export function SchemaMappingWorkbench({ onBack, onComplete }: SchemaMappingWork
         <button
           type="button"
           disabled={!isReady}
-          className={clsx(
-            "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-5 text-[0.84rem] font-medium transition-all",
-            isReady
-              ? "bg-[var(--color-ink)] text-[var(--color-cream-soft)] shadow-[var(--shadow-button-inset)] hover:opacity-80 active:translate-y-px"
-              : "cursor-not-allowed bg-[var(--color-ink-06)] text-[var(--color-ink-40)]",
-          )}
+          className="primary-button"
           onClick={handleContinue}
           aria-disabled={!isReady}
         >

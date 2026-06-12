@@ -3,14 +3,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Sparkles, Check, AlertTriangle, X } from "lucide-react";
+import { Sparkles, Check, AlertTriangle, X, Eye, Circle } from "lucide-react";
 import clsx from "clsx";
-import useSWRMutation from "swr/mutation";
 
 import { MappingReviewTable } from "@/components/MappingReviewTable";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { WizardFooter } from "@/components/wizard/WizardFooter";
 import { toast } from "@/components/ui/sonner";
 import type { ColumnProfile, FieldMapping, TargetField } from "@/lib/mapping/mapping.types";
@@ -27,10 +33,13 @@ type MissingFieldsInfo = {
 
 type WorkbenchPhase = "init" | "creating-run" | "analyzing" | "review" | "confirming" | "output" | "error";
 
-type LogEntry = {
+type StepStatus = "pending" | "processing" | "done";
+
+type ActivityStep = {
   id: number;
-  message: string;
-  level: "info" | "success" | "warning";
+  label: string;
+  status: StepStatus;
+  elapsed: number | null;
 };
 
 type CreateRunResponse = {
@@ -88,13 +97,6 @@ type MappingWorkbenchProps = {
   initialMappings?: FieldMapping[];
 };
 
-function formatTime(d: Date): string {
-  const hh = String(d.getHours()).padStart(2, "0");
-  const mm = String(d.getMinutes()).padStart(2, "0");
-  const ss = String(d.getSeconds()).padStart(2, "0");
-  return `${hh}:${mm}:${ss}`;
-}
-
 function jsonPreviewFromMappings(mappings: FieldMapping[]): string {
   const obj: Record<string, unknown> = {};
   for (const m of mappings) {
@@ -137,28 +139,48 @@ export function MappingWorkbench({
   const [targetFields, setTargetFields] = useState<TargetField[]>(initialTargetFields ?? []);
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>(initialColumnProfiles ?? []);
   const [mappings, setMappings] = useState<FieldMapping[]>(initialMappings ?? []);
-  const [entries, setEntries] = useState<LogEntry[]>([
-    { id: 0, message: "Initializing mapping engine...", level: "info" },
-  ]);
-  const nextId = useRef(1);
-  const startRef = useRef<number | null>(null);
-  const [elapsed, setElapsed] = useState(0);
-  const liveFeedRef = useRef<HTMLDivElement>(null);
+  const DEFAULT_STEPS: ActivityStep[] = [
+    { id: 0, label: "Preparing your file...", status: "pending", elapsed: null },
+    { id: 1, label: "Reading uploaded columns...", status: "pending", elapsed: null },
+    { id: 2, label: "Finding matching fields...", status: "pending", elapsed: null },
+    { id: 3, label: "Checking mapping results...", status: "pending", elapsed: null },
+    { id: 4, label: "Mapping complete", status: "pending", elapsed: null },
+    { id: 5, label: "Preparing review summary...", status: "pending", elapsed: null },
+  ];
 
-  useEffect(() => {
-    if (liveFeedRef.current) {
-      const viewport = liveFeedRef.current.parentElement;
-      if (viewport) {
-        viewport.scrollTop = viewport.scrollHeight;
-      }
+  const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(DEFAULT_STEPS);
+  const [completedStepIds, setCompletedStepIds] = useState<Set<number>>(new Set());
+  const [showManualButton, setShowManualButton] = useState(false);
+  const [manualConfirmOpen, setManualConfirmOpen] = useState(false);
+  const stepStartTimes = useRef<Map<number, number>>(new Map());
+  const [tick, setTick] = useState(0);
+
+  const updateStepStatus = useCallback((stepId: number, status: StepStatus) => {
+    const now = Date.now();
+    if (status === "processing") {
+      stepStartTimes.current.set(stepId, now);
     }
-  }, [entries]);
+    setActivitySteps((prev) =>
+      prev.map((s) => {
+        if (s.id !== stepId) return s;
+        if (status === "processing") return { ...s, status, elapsed: 0 };
+        if (status === "done") {
+          const start = stepStartTimes.current.get(stepId);
+          const elapsed = start != null ? Math.round((now - start) / 1000) : s.elapsed;
+          return { ...s, status, elapsed };
+        }
+        return { ...s, status };
+      }),
+    );
+    if (status === "done") {
+      setCompletedStepIds((prev) => new Set(prev).add(stepId));
+    }
+  }, []);
 
-  const addLog = useCallback((message: string, level: LogEntry["level"] = "info") => {
-    setEntries((current) => [
-      ...current,
-      { id: nextId.current++, message, level },
-    ]);
+  const markStepsRange = useCallback((ids: number[], status: StepStatus) => {
+    setActivitySteps((prev) =>
+      prev.map((s) => (ids.includes(s.id) ? { ...s, status } : s)),
+    );
   }, []);
 
   const runPhase = useCallback(async () => {
@@ -169,7 +191,9 @@ export function MappingWorkbench({
     }
 
     setPhase("creating-run");
-    addLog("Creating mapping run...", "info");
+    updateStepStatus(0, "done");
+    await new Promise((r) => setTimeout(r, 350));
+    updateStepStatus(1, "processing");
 
     try {
       const createRes = await fetch("/api/mapping-runs", {
@@ -198,16 +222,14 @@ export function MappingWorkbench({
       setRunId(run.id);
       setTargetFields(run.targetFields);
       setColumnProfiles(run.columnProfiles);
-      addLog(`Run created — ${run.targetFields.length} target fields detected`, "success");
+      updateStepStatus(1, "done");
       if (createData.warning) {
         setWarningMessage(createData.warning);
-        addLog(createData.warning, "warning");
       }
 
+      await new Promise((r) => setTimeout(r, 400));
       setPhase("analyzing");
-      startRef.current = Date.now();
-      addLog("Analyzing column headers and sample data...", "info");
-      addLog("Comparing with target schema fields...", "info");
+      updateStepStatus(2, "processing");
 
       const suggestRes = await fetch(`/api/mapping-runs/${run.id}/suggest`, {
         method: "POST",
@@ -218,22 +240,27 @@ export function MappingWorkbench({
         throw new Error(suggestData.error ?? "AI matching failed.");
       }
 
+      updateStepStatus(2, "done");
+
       const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
       setMappings(suggested);
-      addLog("AI matching completed successfully", "success");
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(3, "done");
 
-      const autoMapped = suggested.filter((m) => m.sourceColumn && m.confidence >= 0.5).length;
-      const needsReview = suggested.filter((m) => !m.sourceColumn || m.confidence < 0.5).length;
-      addLog(`${autoMapped} fields auto-mapped, ${needsReview} need review`, "info");
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(4, "done");
+
+      updateStepStatus(5, "processing");
+      await new Promise((r) => setTimeout(r, 2000));
+      updateStepStatus(5, "done");
 
       setPhase("review");
     } catch (err) {
       setPhase("error");
       const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
       setErrorMessage(msg);
-      addLog(msg, "warning");
     }
-  }, [uploadId, templateId, sheet, addLog]);
+  }, [uploadId, templateId, sheet, updateStepStatus]);
 
   useEffect(() => {
     if (phase !== "init") return;
@@ -252,17 +279,42 @@ export function MappingWorkbench({
   }, [phase, uploadId, templateId, runPhase]);
 
   useEffect(() => {
-    if (phase !== "analyzing" || !startRef.current) return;
-
-    let cancelled = false;
-    const tick = () => {
-      if (cancelled) return;
-      setElapsed(Math.floor((Date.now() - (startRef.current ?? Date.now())) / 1000));
-      requestAnimationFrame(tick);
-    };
-    const raf = requestAnimationFrame(tick);
-    return () => { cancelled = true; cancelAnimationFrame(raf); };
+    if (
+      phase !== "init" &&
+      phase !== "creating-run" &&
+      phase !== "analyzing"
+    ) {
+      setShowManualButton(false);
+      return;
+    }
+    setShowManualButton(false);
+    const timer = setTimeout(() => {
+      setShowManualButton(true);
+    }, 10000);
+    return () => clearTimeout(timer);
   }, [phase]);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTick((t) => t + 1);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
+    const now = Date.now();
+    setActivitySteps((prev) =>
+      prev.map((s) => {
+        if (s.status !== "processing") return s;
+        const start = stepStartTimes.current.get(s.id);
+        if (start == null) return s;
+        return { ...s, elapsed: Math.round((now - start) / 1000) };
+      }),
+    );
+  }, [tick]);
+
+  const formatElapsed = (s: number) =>
+    s >= 60 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${s}s`;
 
   const handleBack = useCallback(() => {
     onBack?.();
@@ -270,8 +322,19 @@ export function MappingWorkbench({
 
   const handleConfirm = useCallback(async () => {
     if (!runId) return;
+
+    const unmappedRequired = targetFields.filter(
+      (f) => f.required && !mappings.some((m) => m.targetPath === f.path && (m.sourceColumn || m.constantValue)),
+    );
+    if (unmappedRequired.length > 0) {
+      const names = unmappedRequired.map((f) => f.path).join(", ");
+      toast.error("Required fields unmapped", {
+        description: `${unmappedRequired.length} required field${unmappedRequired.length > 1 ? "s" : ""} still need a source column: ${names}`,
+      });
+      return;
+    }
+
     setPhase("confirming");
-    addLog("Saving confirmed mappings...", "info");
 
     try {
       const confirmRes = await fetch(`/api/mapping-runs/${runId}/confirm`, {
@@ -285,10 +348,7 @@ export function MappingWorkbench({
         throw new Error(confirmData.error ?? "Failed to confirm mappings.");
       }
 
-      addLog("Mappings confirmed", "success");
-
       setPhase("output");
-      addLog("Generating output JSON...", "info");
 
       const outputRes = await fetch(`/api/mapping-runs/${runId}/output`, {
         method: "POST",
@@ -299,7 +359,6 @@ export function MappingWorkbench({
         throw new Error(outputData.error ?? "Output generation failed.");
       }
 
-      addLog("Output generated successfully", "success");
       toast.success("Output ready", { description: "Your mapped data is ready to export." });
       onComplete?.(runId);
     } catch (err) {
@@ -307,7 +366,7 @@ export function MappingWorkbench({
       const msg = err instanceof Error ? err.message : "Confirmation failed.";
       toast.error("Confirmation failed", { description: msg });
     }
-  }, [runId, mappings, addLog, onComplete]);
+  }, [runId, mappings, targetFields, onComplete]);
 
   const autoMappedCount = mappings.filter((m) => m.sourceColumn && m.confidence >= 0.5).length;
   const needsReviewCount = mappings.filter((m) => m.sourceColumn && m.confidence < 0.5).length;
@@ -318,78 +377,105 @@ export function MappingWorkbench({
 
   const isBusy = phase === "creating-run" || phase === "analyzing" || phase === "confirming" || phase === "output";
 
-  if (phase === "creating-run" || phase === "analyzing") {
-    const progressPercent = Math.min(100, Math.round((elapsed / 12) * 100));
-
+  if (phase === "init" || phase === "creating-run" || phase === "analyzing") {
     return (
-      <div className="mx-auto flex min-h-0 h-full w-full max-w-[800px] flex-1 flex-col gap-6 px-1 overflow-hidden">
+      <div className="mx-auto flex min-h-0 h-full w-full max-w-[800px] flex-1 flex-col justify-center gap-6 px-1 overflow-hidden relative">
         {warningMessage ? (
           <div className="rounded-xl border border-[rgba(255,214,102,0.3)] bg-[rgba(255,214,102,0.1)] px-5 py-3 text-sm text-[var(--color-warning)]">
             {warningMessage}
           </div>
         ) : null}
-        <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)]">
+        <div className="flex flex-col overflow-hidden rounded-xl bg-transparent">
           <div className="flex flex-col items-center px-10 pb-6 pt-10 text-center">
             <h3 className="m-0 font-[var(--font-display)] text-[clamp(2.2rem,3.6vw,3.2rem)] font-semibold tracking-[-0.07rem] text-[var(--color-ink)]">
-              Mapping Intelligence
+              Schema Mapping in Progress
             </h3>
             <p className="m-0 mt-4 max-w-[42ch] text-[1rem] leading-relaxed text-[var(--color-muted)]">
-              AI is matching your column headers to the target schema.
+              We&apos;re matching your uploaded columns to the target schema. Review and adjust the results once mapping is complete.
             </p>
           </div>
 
-          <div className="mx-6 mb-6 overflow-hidden rounded-[14px] border border-[var(--color-border)] bg-[rgba(247,244,237,0.55)] px-6 py-6 shadow-[0_1px_2px_rgba(0,0,0,0.04)]">
-            <div className="h-1 overflow-hidden rounded-full bg-[var(--color-ink-06)]">
-              <div
-                className={clsx(
-                  "h-full rounded-full transition-all duration-500 ease-out",
-                  phase === "analyzing" ? "bg-[var(--color-ink-40)] animate-shimmer" : "bg-[var(--color-success)]",
-                )}
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-            <p className="mt-2 text-[0.78rem] text-[var(--color-muted)]">
-              {phase === "creating-run" ? "Preparing mapping environment..." : "Analyzing columns and generating suggestions..."}
-            </p>
-          </div>
-        </div>
-
-        <div className="flex flex-col overflow-hidden rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)]">
-          <div className="flex items-center justify-between gap-3 border-b border-[var(--color-border)] px-6 py-4">
-            <div className="flex items-center gap-2.5">
-              <span className="text-[0.82rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-ink)]">
-                Live Activity
-              </span>
-              <span className="block h-2 w-2 rounded-full bg-[var(--color-error)] animate-pulse" />
-            </div>
-          </div>
-
-          <ScrollArea className="max-h-[200px]">
-            <div ref={liveFeedRef} className="flex flex-col gap-0 px-6 py-4">
-              {entries.map((entry, index) => (
+          <div className="mx-6 mb-6 overflow-hidden rounded-lg bg-[rgba(247,244,237,0.55)] px-6 py-6">
+            <div className="flex flex-col items-center gap-3">
+              {activitySteps.map((step) => (
                 <div
-                  key={entry.id}
+                  key={step.id}
                   className={clsx(
-                    "flex items-start gap-3 py-1.5 text-[0.8rem] leading-relaxed",
-                    entry.level === "success" && "text-[var(--color-success)]",
-                    entry.level === "warning" && "text-[var(--color-warning)]",
-                    entry.level === "info" && "text-[var(--color-ink-82)]",
+                    "flex items-center gap-3 py-1 text-[0.82rem] leading-relaxed transition-colors duration-300",
+                    step.status === "pending" && "text-[var(--color-ink-30)]",
+                    step.status === "processing" && "text-[var(--color-ink)] font-medium",
+                    step.status === "done" && "text-[var(--color-success)]",
                   )}
                 >
-                  <span className="shrink-0 font-[var(--font-mono)] text-[0.68rem] text-[var(--color-ink-40)]">
-                    {formatTime(new Date(Date.now() - (entries.length - index) * 800))}
+                  <span className="relative flex shrink-0 items-center justify-center" style={{ width: 14, height: 14 }}>
+                    {step.status === "pending" && (
+                      <Circle className="h-3 w-3 text-[var(--color-error)]" fill="currentColor" />
+                    )}
+                    {step.status === "processing" && (
+                      <span className="relative flex h-3 w-3">
+                        <span className="absolute inset-0 rounded-full bg-[var(--color-warning)] opacity-75 animate-ping" />
+                        <span className="relative h-3 w-3 rounded-full bg-[var(--color-warning)]" />
+                      </span>
+                    )}
+                    {step.status === "done" && (
+                      <Check className="h-3.5 w-3.5" />
+                    )}
                   </span>
-                  <span className="min-w-0">{entry.message}</span>
+                  <span>{step.label}</span>
+                  {step.elapsed != null && (
+                    <span className="ml-1 text-[0.7rem] tabular-nums text-[var(--color-muted)]">
+                      {formatElapsed(step.elapsed)}
+                    </span>
+                  )}
                 </div>
               ))}
-              <div className="flex items-center gap-3 py-1.5 text-[0.75rem] italic text-[var(--color-muted)]">
-                <span className="shrink-0 font-[var(--font-mono)] text-[0.68rem] text-[var(--color-ink-40)]">
-                  {formatTime(new Date())}
-                </span>
-                <span>Processing...</span>
-              </div>
             </div>
-          </ScrollArea>
+          </div>
+
+          {showManualButton && runId && targetFields.length > 0 ? (
+            <div className="absolute right-4 bottom-4">
+              <Dialog open={manualConfirmOpen} onOpenChange={setManualConfirmOpen}>
+                <DialogTrigger render={
+                  <button className="text-[0.7rem] text-[var(--color-muted)] underline-offset-2 underline cursor-pointer bg-transparent border-none p-0 hover:text-[var(--color-ink)] transition-colors">
+                    Taking longer than expected?
+                  </button>
+                } />
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Switch to manual mapping?</DialogTitle>
+                  </DialogHeader>
+                  <p className="text-sm text-[var(--color-muted)]">
+                    Schema mapping is still in progress. If you switch now, current suggestions will be discarded and you can map each column manually.
+                  </p>
+                  <div className="mt-4 flex justify-end gap-3">
+                    <Button variant="outline" size="sm" onClick={() => setManualConfirmOpen(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setMappings(
+                          targetFields.map((field) => ({
+                            targetPath: field.path,
+                            sourceColumn: null,
+                            confidence: 0,
+                            transform: "none",
+                            reason: "",
+                            constantValue: null,
+                          })),
+                        );
+                        setManualConfirmOpen(false);
+                        setShowManualButton(false);
+                        setPhase("review");
+                      }}
+                    >
+                      Yes, map manually
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          ) : null}
         </div>
       </div>
     );
@@ -397,7 +483,7 @@ export function MappingWorkbench({
 
   if (phase === "error") {
     return (
-      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col items-center gap-6 px-1">
+      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col items-center justify-center gap-6 px-1">
         <div className="flex flex-col items-center text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(176,0,32,0.08)]">
             <X className="h-8 w-8 text-[var(--color-error)]" />
@@ -441,9 +527,30 @@ export function MappingWorkbench({
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={handleBack}>Back to upload</Button>
-          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setEntries([{ id: nextId.current++, message: "Retrying...", level: "info" }]); }}>
+          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); }}>
             Retry
           </Button>
+          {runId && targetFields.length > 0 ? (
+            <Button
+              variant="secondary"
+              onClick={() => {
+                setMappings(
+                  targetFields.map((field) => ({
+                    targetPath: field.path,
+                    sourceColumn: null,
+                    confidence: 0,
+                    transform: "none",
+                    reason: "",
+                    constantValue: null,
+                  })),
+                );
+                setPhase("review");
+                setErrorMessage(null);
+              }}
+            >
+              Map manually
+            </Button>
+          ) : null}
         </div>
       </div>
     );
@@ -470,43 +577,33 @@ export function MappingWorkbench({
           />
         </div>
 
-        <aside className="flex min-h-0 w-full shrink-0 flex-col gap-4 xl:w-[340px]">
-          <div className="rounded-[2rem] border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
-            <Badge variant="outline" className="rounded-full">Readiness summary</Badge>
-            <h3 className="mt-4 text-lg font-semibold">
-              {isReady ? "Ready to confirm" : "Review required"}
-            </h3>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              {isReady
-                ? "All required fields are mapped. You can proceed to generate output."
-                : `${blockingUnmapped} required field${blockingUnmapped > 1 ? "s" : ""} still need attention.`}
-            </p>
-
-            <div className="mt-6 grid grid-cols-3 gap-3">
-              <div className="rounded-xl border border-[var(--color-border)] bg-[rgba(45,106,79,0.06)] px-3 py-3 text-center">
-                <div className="text-xl font-bold text-[var(--color-success)]">{autoMappedCount}</div>
-                <div className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">Auto</div>
-              </div>
-              <div className="rounded-xl border border-[var(--color-border)] bg-[rgba(255,214,102,0.12)] px-3 py-3 text-center">
-                <div className="text-xl font-bold text-[var(--color-warning)]">{needsReviewCount}</div>
-                <div className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">Review</div>
-              </div>
-              <div className="rounded-xl border border-[var(--color-border)] bg-[rgba(176,0,32,0.06)] px-3 py-3 text-center">
-                <div className="text-xl font-bold text-[var(--color-error)]">{unmappedCount}</div>
-                <div className="mt-1 text-[0.65rem] font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">Unmapped</div>
-              </div>
+        <aside className="flex min-h-0 w-full shrink-0 flex-col gap-4 xl:w-[300px]">
+          <div className="rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
+            <div className="flex items-center justify-between">
+              <Badge variant="outline" className="rounded-full">Readiness</Badge>
+              {isReady ? (
+                <Check className="h-4 w-4 text-[var(--color-success)]" />
+              ) : null}
             </div>
 
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-xs text-[var(--color-muted)]">
-                <span>Progress</span>
-                <span>{totalFields > 0 ? `${autoMappedCount + needsReviewCount}/${totalFields}` : "0/0"}</span>
+            <div className="mt-5 space-y-2 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--color-muted)]">Required mapped</span>
+                <span className="font-semibold">
+                  {totalFields - blockingUnmapped}/{totalFields}
+                </span>
               </div>
-              <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-[var(--color-ink-06)]">
-                <div
-                  className="h-full rounded-full bg-[var(--color-success)] transition-all duration-300"
-                  style={{ width: totalFields > 0 ? `${((autoMappedCount + needsReviewCount) / totalFields) * 100}%` : "0%" }}
-                />
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--color-muted)]">Review recommended</span>
+                <span className={clsx("font-semibold", needsReviewCount > 0 && "text-[var(--color-warning)]")}>
+                  {needsReviewCount}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-[var(--color-muted)]">Unmapped</span>
+                <span className={clsx("font-semibold", unmappedCount > 0 && "text-[var(--color-error)]")}>
+                  {unmappedCount}
+                </span>
               </div>
             </div>
 
@@ -530,17 +627,66 @@ export function MappingWorkbench({
             ) : null}
           </div>
 
-          <div className="flex flex-col rounded-[2rem] border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
-            <Badge variant="outline" className="rounded-full">JSON preview</Badge>
-            <h3 className="mt-4 text-lg font-semibold">Output shape</h3>
-            <p className="mt-1 text-sm text-[var(--color-muted)]">
-              Structural preview based on current mappings. Actual values are applied during generation.
-            </p>
-            <ScrollArea className="mt-4 max-h-[280px] rounded-xl border border-[var(--color-border)] bg-[#fffdfa] p-4">
-              <pre className="m-0 text-[0.72rem] leading-relaxed text-[var(--color-ink)]">
-                {mappings.length > 0 ? jsonPreviewFromMappings(mappings) : "// No mappings yet"}
-              </pre>
-            </ScrollArea>
+          <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
+            <Badge variant="outline" className="rounded-full">Actions</Badge>
+
+            <Dialog>
+              <DialogTrigger render={<Button variant="outline" className="w-full justify-start rounded-xl" size="sm" />}>
+                <Eye className="mr-2 h-4 w-4" />
+                Preview JSON
+              </DialogTrigger>
+              <DialogContent className="max-w-5xl max-h-[85vh]">
+                <DialogHeader>
+                  <DialogTitle>Output preview</DialogTitle>
+                </DialogHeader>
+                <ScrollArea className="max-h-[65vh] rounded-xl border border-[var(--color-border)] bg-[var(--color-cream-soft)] p-4 overflow-x-auto">
+                  <pre className="m-0 text-[0.72rem] leading-relaxed text-[var(--color-ink)] whitespace-pre">
+                    {mappings.length > 0 ? jsonPreviewFromMappings(mappings) : "// No mappings yet"}
+                  </pre>
+                </ScrollArea>
+              </DialogContent>
+            </Dialog>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start rounded-xl"
+              onClick={() => {
+                setMappings(
+                  mappings.map((mapping) => {
+                    const field = targetFields.find((item) => item.path === mapping.targetPath);
+                    if (field?.type !== "string" || !mapping.sourceColumn) {
+                      return mapping;
+                    }
+                    return { ...mapping, transform: "trim" };
+                  }),
+                );
+              }}
+            >
+              <Sparkles className="mr-2 h-4 w-4" />
+              Apply trim to text fields
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full justify-start rounded-xl"
+              onClick={() => {
+                setMappings(
+                  targetFields.map((field) => ({
+                    targetPath: field.path,
+                    sourceColumn: null,
+                    confidence: 0,
+                    transform: "none",
+                    reason: "",
+                    constantValue: null,
+                  })),
+                );
+              }}
+            >
+              <X className="mr-2 h-4 w-4" />
+              Reset suggestions
+            </Button>
           </div>
         </aside>
       </div>
@@ -548,7 +694,7 @@ export function MappingWorkbench({
       <WizardFooter
         statusText={
           phase === "review" && isReady
-            ? "Ready to confirm"
+            ? "All required fields mapped"
             : phase === "review" && !isReady
               ? `${blockingUnmapped} required field${blockingUnmapped > 1 ? "s" : ""} unmapped`
               : phase === "confirming"
@@ -558,7 +704,13 @@ export function MappingWorkbench({
                   : "Processing"
         }
         statusReady={isReady}
-        primaryLabel={phase === "confirming" || phase === "output" ? "Processing..." : "Confirm & Generate"}
+        primaryLabel={
+          phase === "confirming" || phase === "output"
+            ? "Processing..."
+            : isReady
+              ? "Confirm & Generate"
+              : "Review required fields"
+        }
         onPrimary={handleConfirm}
         primaryDisabled={!isReady || isBusy}
         secondaryLabel="Back"

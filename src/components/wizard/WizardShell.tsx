@@ -1,9 +1,21 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
+import { useState } from "react";
 
 import clsx from "clsx";
+
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 import { useWizardProgress } from "./WizardProgressContext";
 import { WizardTopBar } from "./WizardTopBar";
@@ -17,9 +29,12 @@ const steps = [
 
 export function WizardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const [showBackConfirm, setShowBackConfirm] = useState(false);
   const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
   const { isStepAccessible } = useWizardProgress();
   const showSharedTopBar = true;
+  const requireBackConfirmation = activeStep.number === "02" || activeStep.number === "03";
 
   return (
     <div className="workspace-shell wizard-shell-frame">
@@ -69,15 +84,40 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="wizard-sidebar-links">
-          <Link href="/" className="dashboard-sidebar-link">
-            Dashboard
-          </Link>
-          <Link href="/studio" className="dashboard-sidebar-link">
-            Matching lab
-          </Link>
+        <div className="wizard-sidebar-bottom">
+          {requireBackConfirmation ? (
+            <button
+              type="button"
+              className="ghost-button"
+              onClick={() => setShowBackConfirm(true)}
+            >
+              Back to dashboard
+            </button>
+          ) : (
+            <Link href="/" className="ghost-button">
+              Back to dashboard
+            </Link>
+          )}
         </div>
       </aside>
+
+      <AlertDialog open={showBackConfirm} onOpenChange={setShowBackConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Leave wizard?</AlertDialogTitle>
+            <AlertDialogDescription>
+              You have unsaved progress. Going back to the dashboard will discard any changes made
+              in this step.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogAction onClick={() => router.push("/")}>
+              Leave
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <div className="wizard-main-shell">
         {showSharedTopBar ? (
@@ -85,7 +125,6 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
             stepNumber={`Step ${activeStep.number}`}
             title={activeStep.title}
             description={activeStep.description}
-            requireBackConfirmation={activeStep.number === "02" || activeStep.number === "03"}
           />
         ) : null}
         <main className="wizard-content">{children}</main>

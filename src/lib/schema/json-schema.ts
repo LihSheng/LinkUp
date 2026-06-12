@@ -25,34 +25,37 @@ function _flattenJsonSchema(
   const typed = schema as JsonSchema;
   const nextType = typed.type ?? "object";
 
+  const results: TargetField[] = [];
+
   if (nextType === "object" && typed.properties) {
     const requiredSet = new Set(typed.required ?? []);
 
-    return Object.entries(typed.properties).flatMap(([key, value]) => {
+    for (const [key, value] of Object.entries(typed.properties)) {
       const nextPrefix = prefix ? `${prefix}.${key}` : key;
-      return _flattenJsonSchema(value, nextPrefix, requiredSet.has(key));
+      results.push(..._flattenJsonSchema(value, nextPrefix, requiredSet.has(key)));
+    }
+  } else if (nextType === "array") {
+    results.push({
+      path: prefix,
+      type: typed.items?.type ? `${typed.items.type}[]` : "array",
+      required,
+      description: typed.description,
     });
-  }
-
-  if (nextType === "array") {
-    return [
-      {
-        path: prefix,
-        type: typed.items?.type ? `${typed.items.type}[]` : "array",
-        required,
-        description: typed.description,
-      },
-    ];
-  }
-
-  return [
-    {
+  } else {
+    results.push({
       path: prefix,
       type: nextType,
       required,
       description: typed.description,
-    },
-  ];
+    });
+  }
+
+  const seen = new Set<string>();
+  return results.filter((field) => {
+    if (seen.has(field.path)) return false;
+    seen.add(field.path);
+    return true;
+  });
 }
 
 export const flattenJsonSchema = cache(_flattenJsonSchema);

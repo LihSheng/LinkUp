@@ -494,13 +494,13 @@ export default function WorkbookStepPage() {
                 ) : null}
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto">
                 <div className="text-sm text-muted-foreground">
                   {columnProfiles.length} column profiles generated from the detected header row.
                 </div>
                 {columnProfiles.length > 0 ? (
                   <div
-                    className="min-w-0 overflow-hidden rounded-sm border border-[var(--color-border)]"
+                    className="min-w-0 rounded-sm border border-[var(--color-border)]"
                   >
                     {columnProfiles.map((col, idx) => (
                       <div

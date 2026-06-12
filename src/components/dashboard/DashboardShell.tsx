@@ -13,7 +13,6 @@ const sidebarItems = [
   { href: "/wizard", label: "Wizard", icon: "wizard" },
   { href: "/wizard/schema", label: "Active Schemas", icon: "schema" },
   { href: "/wizard/mapping", label: "Mapping Tools", icon: "mapping" },
-  { href: "/studio", label: "Documentation", icon: "docs" },
 ] as const;
 
 const topNavItems = [
@@ -86,13 +85,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       <circle cx="17" cy="12" r="1.5" />
                     </svg>
                   )}
-                  {item.icon === "docs" && (
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M7 3.5h7l4 4V20.5H7z" />
-                      <path d="M14 3.5v4h4" />
-                      <path d="M9 11h6M9 15h6" />
-                    </svg>
-                  )}
+
                 </span>
                 {item.label}
               </Link>
@@ -103,13 +96,6 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
         <div className="dashboard-sidebar-bottom">
           <Link href="/wizard/schema" className="dashboard-quick-upload">
             Quick Upload
-          </Link>
-
-          <div className="dashboard-sidebar-divider" aria-hidden="true" />
-
-          <Link href="/studio" className="dashboard-support-link">
-            <span aria-hidden="true">?</span>
-            Support
           </Link>
         </div>
       </aside>

@@ -3,7 +3,6 @@
 import { useState } from "react";
 import clsx from "clsx";
 
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,7 +12,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type {
   ColumnProfile,
   FieldMapping,
@@ -27,8 +33,6 @@ type MappingReviewTableProps = {
   mappings: FieldMapping[];
   onChange: (nextMappings: FieldMapping[]) => void;
 };
-
-type MappingFilter = "all" | "required" | "unmapped" | "low" | "confirmed" | "duplicates";
 
 const transformOptions: TransformRule[] = [
   "none",
@@ -45,7 +49,7 @@ function getConfidenceTone(confidence: number) {
       label: `${Math.round(confidence * 100)}% · High confidence`,
       variant: "default" as const,
       className:
-        "border-[var(--success)]/30 bg-[rgba(45,106,79,0.12)] text-[var(--success)]",
+        "border-[var(--color-success)]/30 bg-[rgba(45,106,79,0.12)] text-[var(--color-success)]",
     };
   }
 
@@ -54,14 +58,14 @@ function getConfidenceTone(confidence: number) {
       label: `${Math.round(confidence * 100)}% · Needs review`,
       variant: "secondary" as const,
       className:
-        "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.18)] text-[var(--warning)]",
+        "border-[var(--color-warning)]/30 bg-[rgba(255,214,102,0.18)] text-[var(--color-warning)]",
     };
   }
 
   return {
     label: `${Math.round(confidence * 100)}% · Low confidence`,
     variant: "destructive" as const,
-    className: "border-[var(--danger)]/20 bg-[rgba(176,0,32,0.08)] text-[var(--danger)]",
+    className: "border-[var(--color-error)]/20 bg-[rgba(176,0,32,0.08)] text-[var(--color-error)]",
   };
 }
 
@@ -71,7 +75,8 @@ export function MappingReviewTable({
   mappings,
   onChange,
 }: MappingReviewTableProps) {
-  const [filter, setFilter] = useState<MappingFilter>("all");
+  const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
+  const [showConstantValue, setShowConstantValue] = useState<Set<string>>(new Set());
   const mappingByPath = new Map(mappings.map((mapping) => [mapping.targetPath, mapping]));
   const columnByName = new Map(columns.map((column) => [column.name, column]));
 
@@ -101,6 +106,25 @@ export function MappingReviewTable({
     onChange(nextMappings);
   };
 
+  const acceptMapping = (targetPath: string) => {
+    updateMapping(targetPath, (current) => ({
+      ...current,
+      confidence: 0.95,
+    }));
+  };
+
+  const toggleDetails = (targetPath: string) => {
+    setExpandedDetails((prev) => {
+      const next = new Set(prev);
+      if (next.has(targetPath)) {
+        next.delete(targetPath);
+      } else {
+        next.add(targetPath);
+      }
+      return next;
+    });
+  };
+
   const rows = targetFields.map((field) => {
     const mapping =
       mappingByPath.get(field.path) ??
@@ -120,39 +144,21 @@ export function MappingReviewTable({
     const sourceProfile = mapping.sourceColumn
       ? columnByName.get(mapping.sourceColumn) ?? null
       : null;
-    const samples = sourceProfile?.samples
-      ?.filter((value) => value !== null && value !== undefined && String(value).trim() !== "")
-      .slice(0, 3)
-      .map((value) => String(value)) ?? [];
 
     let status: "blocking" | "review" | "confirmed" | "optional" = "optional";
-    let statusLabel = "Optional";
-    let statusNote = "Not mapped yet.";
 
     if (field.required && !hasAssignment) {
       status = "blocking";
-      statusLabel = "Required";
-      statusNote = "This field must be mapped before JSON can be generated.";
     } else if (duplicate) {
       status = "review";
-      statusLabel = "Duplicate source";
-      statusNote = "This source column is mapped to more than one target field.";
     } else if (!hasAssignment) {
       status = "optional";
-      statusLabel = "Optional";
-      statusNote = "You can leave this empty if the field is not needed.";
     } else if (confidence < 0.5) {
       status = "review";
-      statusLabel = "Low confidence";
-      statusNote = "The suggestion is weak and should be checked manually.";
     } else if (confidence < 0.85) {
       status = "review";
-      statusLabel = "Needs review";
-      statusNote = "This mapping looks plausible but still needs confirmation.";
     } else {
       status = "confirmed";
-      statusLabel = "Looks good";
-      statusNote = "This suggestion is strong enough for a quick confirmation pass.";
     }
 
     return {
@@ -162,311 +168,273 @@ export function MappingReviewTable({
       duplicate,
       confidence,
       sourceProfile,
-      samples,
       status,
-      statusLabel,
-      statusNote,
     };
   });
 
-  const filteredRows = rows.filter((row) => {
-    switch (filter) {
-      case "required":
-        return row.field.required;
-      case "unmapped":
-        return !row.hasAssignment;
-      case "low":
-        return row.status === "review";
-      case "confirmed":
-        return row.status === "confirmed";
-      case "duplicates":
-        return row.duplicate;
-      default:
-        return true;
-    }
-  });
+  const needsReviewCount = rows.filter(
+    (row) => row.status === "blocking" || row.status === "review",
+  ).length;
 
-  const filterCounts = {
-    all: rows.length,
-    required: rows.filter((row) => row.field.required).length,
-    unmapped: rows.filter((row) => !row.hasAssignment).length,
-    low: rows.filter((row) => row.status === "review").length,
-    confirmed: rows.filter((row) => row.status === "confirmed").length,
-    duplicates: rows.filter((row) => row.duplicate).length,
+  function hasTypeMismatch(expectedType: string, detectedType: string | undefined): boolean {
+    if (!detectedType || detectedType === "mixed" || detectedType === "empty") return false;
+    const normalize = (t: string) => {
+      const lower = t.toLowerCase();
+      if (lower === "integer" || lower === "float" || lower === "double") return "number";
+      if (lower === "text") return "string";
+      if (lower === "datetime" || lower === "timestamp") return "date";
+      if (lower === "bool") return "boolean";
+      return lower;
+    };
+    return normalize(expectedType) !== normalize(detectedType);
+  }
+
+  const rowColor = (row: (typeof rows)[number]) => {
+    if (row.status === "blocking") return "bg-[rgba(176,0,32,0.06)]";
+    if (row.status === "review") return "bg-[rgba(255,214,102,0.1)]";
+    return "";
   };
 
-  const filters: Array<{ key: MappingFilter; label: string }> = [
-    { key: "all", label: "All" },
-    { key: "required", label: "Required" },
-    { key: "unmapped", label: "Unmapped" },
-    { key: "low", label: "Low confidence" },
-    { key: "confirmed", label: "Confirmed" },
-    { key: "duplicates", label: "Duplicates" },
-  ];
-
-  const statusBadgeVariant = (status: string) => {
-    switch (status) {
-      case "blocking": return "destructive" as const;
-      case "review": return "secondary" as const;
-      case "confirmed": return "default" as const;
-      default: return "outline" as const;
+  const issueText = (row: (typeof rows)[number]) => {
+    const issues: string[] = [];
+    if (row.status === "blocking") issues.push("Required field not mapped");
+    if (row.duplicate) issues.push("Duplicate source");
+    if (row.sourceProfile) {
+      const mismatch = hasTypeMismatch(row.field.type, row.sourceProfile.detectedType);
+      if (mismatch) issues.push(`Source looks ${row.sourceProfile.detectedType}`);
     }
+    return issues.length > 0 ? issues.join("; ") : null;
   };
 
   return (
-    <Card className="flex h-full min-h-0 flex-col gap-0 rounded-[2rem] p-6">
-      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 p-0">
-        <div>
-          <Badge variant="outline" className="rounded-full">Mapping review</Badge>
-          <h2 className="mt-3 text-2xl font-semibold">Resolve what needs attention</h2>
-          <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Review required fields first, then check low-confidence or duplicate mappings.
-            Details stay expandable so the main pass feels lighter.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant="secondary">Fields: {targetFields.length}</Badge>
-          <Badge variant="secondary">Columns: {columns.length}</Badge>
-          <Badge variant="secondary">Duplicates: {filterCounts.duplicates}</Badge>
-        </div>
-      </CardHeader>
+    <div className="flex h-full min-h-0 flex-col gap-0">
+      <div className="flex items-baseline gap-2">
+          <span className="text-sm font-semibold text-[var(--color-muted)]">
+            Mapping review
+          </span>
+          <span className="text-xs text-[var(--color-ink-40)]">&middot;</span>
+          <span className="text-xs text-[var(--color-muted)]">
+          {targetFields.length} fields &middot; {needsReviewCount} need attention
+        </span>
+      </div>
 
-      <CardContent className="mt-5 flex min-h-0 flex-1 flex-col p-0">
-        <div className="flex flex-wrap gap-2">
-          {filters.map((item) => (
-            <Button
-              key={item.key}
-              type="button"
-              variant={filter === item.key ? "default" : "outline"}
-              size="sm"
-              className="rounded-full"
-              onClick={() => setFilter(item.key)}
-            >
-              {item.label} · {filterCounts[item.key]}
-            </Button>
-          ))}
-        </div>
+      <div className="mt-5 flex min-h-0 flex-1 flex-col">
+        <div className="min-h-0 flex-1 overflow-auto rounded-xl border border-[var(--color-border)]">
+          <Table>
+            <TableHeader className="sticky top-0 z-10">
+              <TableRow className="bg-[var(--color-ink-03)]">
+                <TableHead className="w-[160px] min-w-[120px]">Target Field</TableHead>
+                <TableHead className="w-[70px]">Type</TableHead>
+                <TableHead className="min-w-[180px] w-[220px]">Suggested Source</TableHead>
+                <TableHead className="w-[120px]">Transform</TableHead>
+                <TableHead className="w-[110px]">Confidence</TableHead>
+                <TableHead className="w-auto min-w-[140px]">Issue</TableHead>
+                <TableHead className="w-[120px]">Action</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} className="h-32 text-center text-sm text-[var(--color-muted)]">
+                    No fields to display.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                rows.flatMap((row) => {
+                  const confidenceTone = getConfidenceTone(row.confidence);
+                  const issue = issueText(row);
+                  const hasConst = showConstantValue.has(row.field.path);
 
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            onClick={() => {
-              onChange(
-                mappings.map((mapping) => {
-                  const field = targetFields.find((item) => item.path === mapping.targetPath);
-
-                  if (field?.type !== "string" || !mapping.sourceColumn) {
-                    return mapping;
-                  }
-
-                  return { ...mapping, transform: "trim" };
-                }),
-              );
-            }}
-          >
-            Apply trim to text fields
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="rounded-full"
-            onClick={() => {
-              onChange(
-                targetFields.map((field) => ({
-                  targetPath: field.path,
-                  sourceColumn: null,
-                  confidence: 0,
-                  transform: "none",
-                  reason: "",
-                  constantValue: null,
-                })),
-              );
-            }}
-          >
-            Reset all suggestions
-          </Button>
-        </div>
-
-        <div className="mt-6 min-h-0 flex-1 overflow-hidden">
-          <ScrollArea className="h-full">
-            <div className="grid gap-4 pr-2">
-              {filteredRows.map((row) => {
-                const confidenceTone = getConfidenceTone(row.confidence);
-
-                return (
-                  <article
-                    key={row.field.path}
-                    className={clsx(
-                      "rounded-[1.6rem] border p-5 transition",
-                      row.status === "blocking" &&
-                        "border-[var(--danger)]/25 bg-[rgba(176,0,32,0.05)]",
-                      row.status === "review" &&
-                        "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.14)]",
-                      row.status === "confirmed" &&
-                        "border-[var(--success)]/20 bg-[rgba(45,106,79,0.06)]",
-                      row.status === "optional" && "border-border bg-card/80",
-                    )}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-4">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h3 className="text-lg font-semibold">{row.field.path}</h3>
-                          <Badge variant="outline" className="rounded-full">{row.field.type}</Badge>
+                  return [
+                    <TableRow
+                      key={row.field.path}
+                      className={clsx("group", rowColor(row))}
+                    >
+                      <TableCell className="font-medium">
+                        <div className="flex items-center gap-1.5">
+                          <span className="truncate text-sm">{row.field.path}</span>
                           {row.field.required ? (
-                            <Badge variant="destructive" className="rounded-full">Required</Badge>
+                            <span className="shrink-0 text-[10px] font-semibold uppercase tracking-wide text-[var(--color-error)]">
+                              *
+                            </span>
                           ) : null}
                         </div>
-                        <p className="mt-2 text-sm text-muted-foreground">{row.statusNote}</p>
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        <Badge
-                          variant={statusBadgeVariant(row.status)}
-                          className={clsx(
-                            "rounded-full",
-                            row.status !== "optional" && row.status !== "confirmed" && row.status !== "blocking" && row.status !== "review" && "border-border bg-white text-muted-foreground",
-                          )}
-                        >
-                          {row.statusLabel}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="rounded-full text-xs font-normal">
+                          {row.field.type}
                         </Badge>
-                        <Badge
-                          variant={confidenceTone.variant}
-                          className={clsx("rounded-full", confidenceTone.className)}
-                        >
-                          {confidenceTone.label}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_220px]">
-                      <div>
-                        <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Suggested source
-                        </label>
-                        <Select
-                          value={row.mapping.sourceColumn ?? ""}
-                          onValueChange={(value) => {
-                            updateMapping(row.field.path, (current) => ({
-                              ...current,
-                              sourceColumn: value || null,
-                            }));
-                          }}
-                        >
-                          <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
-                            <SelectValue placeholder="Unmapped" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="">Unmapped</SelectItem>
-                            {columns.map((column) => (
-                              <SelectItem key={column.name} value={column.name}>
-                                {column.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                          {row.samples.length > 0 ? (
-                            row.samples.map((sample) => (
-                              <span
-                                key={`${row.field.path}-${sample}`}
-                                className="rounded-full bg-[rgba(20,33,61,0.06)] px-3 py-1 text-xs text-muted-foreground"
-                              >
-                                {sample}
-                              </span>
-                            ))
-                          ) : (
-                            <p className="text-xs text-muted-foreground">
-                              Sample values will appear here once a source column is selected.
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                        <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            Transform
-                          </label>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1.5">
                           <Select
-                            value={row.mapping.transform ?? "none"}
+                            value={row.mapping.sourceColumn ?? ""}
                             onValueChange={(value) => {
                               updateMapping(row.field.path, (current) => ({
                                 ...current,
-                                transform: value as TransformRule,
+                                sourceColumn: value || null,
                               }));
                             }}
                           >
-                            <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
-                              <SelectValue />
+                            <SelectTrigger className="h-8 w-full min-w-[120px] max-w-[200px] rounded-full px-3 text-xs">
+                              <SelectValue placeholder="Select source" />
                             </SelectTrigger>
                             <SelectContent>
-                              {transformOptions.map((option) => (
-                                <SelectItem key={option} value={option}>
-                                  {option}
+                              <SelectItem value="">Unmapped</SelectItem>
+                              {columns.map((column) => (
+                                <SelectItem key={column.name} value={column.name}>
+                                  {column.name}
                                 </SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
+                          {hasConst ? (
+                            <div className="flex items-center gap-1">
+                              <input
+                                value={row.mapping.constantValue ?? ""}
+                                onChange={(event) => {
+                                  updateMapping(row.field.path, (current) => ({
+                                    ...current,
+                                    constantValue: event.target.value || null,
+                                  }));
+                                }}
+                                className="h-8 w-20 min-w-[60px] max-w-[120px] rounded-full border border-[var(--color-border)] bg-[var(--color-cream-soft)] px-3 text-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                                placeholder="Default"
+                              />
+                              <button
+                                type="button"
+                                className="text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                                onClick={() => {
+                                  updateMapping(row.field.path, (current) => ({
+                                    ...current,
+                                    constantValue: null,
+                                  }));
+                                  setShowConstantValue((prev) => {
+                                    const next = new Set(prev);
+                                    next.delete(row.field.path);
+                                    return next;
+                                  });
+                                }}
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="shrink-0 text-[11px] text-[var(--color-muted)] hover:text-[var(--color-ink)]"
+                              onClick={() =>
+                                setShowConstantValue((prev) => {
+                                  const next = new Set(prev);
+                                  next.add(row.field.path);
+                                  return next;
+                                })
+                              }
+                            >
+                              + Default
+                            </button>
+                          )}
                         </div>
-                        <div>
-                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                            Expected type
-                          </label>
-                          <div className="mt-2 rounded-2xl border border-input bg-background px-4 py-3 text-sm text-muted-foreground">
-                            {row.field.type}
-                            {row.sourceProfile ? (
-                              <span className="block text-xs text-muted-foreground">
-                                Source looks like {row.sourceProfile.detectedType}
-                              </span>
-                            ) : null}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                          Constant value
-                        </label>
-                        <input
-                          value={row.mapping.constantValue ?? ""}
-                          onChange={(event) => {
+                      </TableCell>
+                      <TableCell>
+                        <Select
+                          value={row.mapping.transform ?? "none"}
+                          onValueChange={(value) => {
                             updateMapping(row.field.path, (current) => ({
                               ...current,
-                              constantValue: event.target.value || null,
+                              transform: value as TransformRule,
                             }));
                           }}
-                          className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                          placeholder="Optional default"
-                        />
-                      </div>
-                    </div>
-
-                    <details className="mt-4 rounded-[1.2rem] border border-border bg-card/70 px-4 py-3">
-                      <summary className="cursor-pointer list-none text-sm font-semibold">
-                        Why this match? Manual notes
-                      </summary>
-                      <textarea
-                        value={row.mapping.reason ?? ""}
-                        onChange={(event) => {
-                          updateMapping(row.field.path, (current) => ({
-                            ...current,
-                            reason: event.target.value,
-                          }));
-                        }}
-                        className="mt-3 min-h-24 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                        placeholder="Add notes, rationale, or override comments."
-                      />
-                    </details>
-                  </article>
-                );
-              })}
-            </div>
-          </ScrollArea>
+                        >
+                            <SelectTrigger className="h-8 w-full min-w-[90px] max-w-[140px] rounded-full px-3 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                          <SelectContent>
+                            {transformOptions.map((option) => (
+                              <SelectItem key={option} value={option}>
+                                {option}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </TableCell>
+                      <TableCell>
+                        <Badge
+                          variant={confidenceTone.variant}
+                          className={clsx(
+                            "rounded-full text-[11px] font-medium whitespace-nowrap",
+                            confidenceTone.className,
+                          )}
+                        >
+                          {`${Math.round(row.confidence * 100)}%`}
+                          {row.confidence < 0.85 ? (
+                            <span className="ml-1 opacity-70">
+                              {row.confidence < 0.5 ? "Low" : "Review"}
+                            </span>
+                          ) : null}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-xs text-[var(--color-muted)]">
+                        {issue || "-"}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-1">
+                          {row.status !== "confirmed" ? (
+                            <Button
+                              type="button"
+                              variant="default"
+                              size="sm"
+                              className="h-7 rounded-full px-3 text-[11px]"
+                              onClick={() => acceptMapping(row.field.path)}
+                            >
+                              Accept
+                            </Button>
+                          ) : (
+                            <span className="text-[11px] text-[var(--color-success)] font-medium">
+                              Done
+                            </span>
+                          )}
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="h-7 rounded-full px-2.5 text-[11px]"
+                            onClick={() => toggleDetails(row.field.path)}
+                          >
+                            {expandedDetails.has(row.field.path) ? "Hide" : "Reason"}
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>,
+                    expandedDetails.has(row.field.path) ? (
+                      <TableRow key={`${row.field.path}-detail`}>
+                        <TableCell colSpan={7} className="bg-[var(--color-ink-03)] p-0">
+                          <div className="px-4 py-3">
+                            <label className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
+                              Manual notes
+                            </label>
+                            <textarea
+                              value={row.mapping.reason ?? ""}
+                              onChange={(event) => {
+                                updateMapping(row.field.path, (current) => ({
+                                  ...current,
+                                  reason: event.target.value,
+                                }));
+                              }}
+                              className="mt-2 min-h-20 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-cream-soft)] px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                              placeholder="Add notes, rationale, or override comments."
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : null,
+                  ];
+                })
+              )}
+            </TableBody>
+          </Table>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }

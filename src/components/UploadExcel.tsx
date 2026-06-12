@@ -68,7 +68,7 @@ export function UploadExcel({
             <p className="font-semibold text-foreground">Current schema</p>
             <p className="mt-2">{activeTemplateName ?? "Select or save a schema first."}</p>
             {disabled ? (
-              <p className="mt-3 text-[var(--warning)]">
+              <p className="mt-3 text-[var(--color-warning)]">
                 Upload is disabled until a schema template is available.
               </p>
             ) : null}

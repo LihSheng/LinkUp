@@ -37,6 +37,9 @@ linkup-dev.out.log
 # env files (can opt-in for committing if needed)
 .env
 
+# storage
+/storage
+
 # vercel
 .vercel
 
