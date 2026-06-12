@@ -93,11 +93,7 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        <div className="dashboard-sidebar-bottom">
-          <Link href="/wizard/schema" className="dashboard-quick-upload">
-            Quick Upload
-          </Link>
-        </div>
+
       </aside>
 
       <div className="dashboard-main-shell">

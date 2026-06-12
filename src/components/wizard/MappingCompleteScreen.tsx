@@ -225,9 +225,8 @@ export function MappingCompleteScreen({
               </button>
               {showErrors ? (
                 <div className="border-t border-[rgba(255,214,102,0.2)] px-6 pb-4 pt-3">
-                  <div className="max-h-[200px] overflow-hidden">
-                    <ScrollArea className="h-full">
-                      <div className="space-y-2">
+                  <div className="max-h-[200px] overflow-y-auto pr-2 [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--color-border)] [&::-webkit-scrollbar-track]:bg-transparent">
+                    <div className="space-y-2">
                       {errors.map((err, i) => (
                         <div key={i} className="rounded-lg border border-[var(--color-border)] bg-[rgba(252,251,248,0.7)] px-3 py-2">
                           <div className="flex items-start gap-2">
@@ -246,7 +245,6 @@ export function MappingCompleteScreen({
                         </div>
                       ))}
                     </div>
-                  </ScrollArea>
                   </div>
                 </div>
               ) : null}
