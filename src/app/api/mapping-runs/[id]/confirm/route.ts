@@ -27,6 +27,21 @@ export async function POST(request: Request, context: RouteContext) {
     },
   });
 
+  const sourceSignaturePayload = run.columnProfiles
+    ? JSON.stringify(run.columnProfiles)
+    : null;
+
+  const templateName = run.displayName ?? run.schemaTemplate.name;
+
+  const mappingTemplate = await prisma.mappingTemplate.create({
+    data: {
+      schemaTemplateId: run.schemaTemplateId,
+      name: templateName,
+      sourceSignature: sourceSignaturePayload,
+      confirmedMapping: payload as Prisma.InputJsonValue,
+    },
+  });
+
   return NextResponse.json({
     run: {
       ...updated,
@@ -34,5 +49,6 @@ export async function POST(request: Request, context: RouteContext) {
       targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
       workbookMeta: run.uploadedFile?.workbookMeta ?? null,
     },
+    mappingTemplateId: mappingTemplate.id,
   });
 }

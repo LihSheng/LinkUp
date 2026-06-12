@@ -76,6 +76,7 @@ type ConfirmResponse = {
     id: string;
     status: string;
   };
+  mappingTemplateId?: string;
 };
 
 type OutputResponse = {
@@ -90,7 +91,7 @@ type OutputResponse = {
 
 type MappingWorkbenchProps = {
   onBack?: () => void;
-  onComplete?: (runId?: string) => void;
+  onComplete?: (runId?: string, mappingTemplateId?: string) => void;
   initialRunId?: string;
   initialTargetFields?: TargetField[];
   initialColumnProfiles?: ColumnProfile[];
@@ -130,7 +131,7 @@ export function MappingWorkbench({
   const templateId = searchParams.get("templateId");
 
   const [phase, setPhase] = useState<WorkbenchPhase>(
-    initialTargetFields && initialMappings ? "review" : "init",
+    initialTargetFields && initialMappings ? "review" : initialTargetFields && initialColumnProfiles && initialColumnProfiles.length > 0 ? "review" : "init",
   );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [missingFieldsInfo, setMissingFieldsInfo] = useState<MissingFieldsInfo | null>(null);
@@ -184,18 +185,68 @@ export function MappingWorkbench({
   }, []);
 
   const runPhase = useCallback(async () => {
-    if (!uploadId || !templateId) {
-      setPhase("error");
-      setErrorMessage("Missing upload ID or template ID. Please go back and try again.");
-      return;
-    }
-
     setPhase("creating-run");
     updateStepStatus(0, "done");
     await new Promise((r) => setTimeout(r, 350));
     updateStepStatus(1, "processing");
 
     try {
+      if (runId) {
+        const profileRes = await fetch(`/api/mapping-runs/${runId}/profile`, {
+          method: "POST",
+        });
+        const profileData: CreateRunResponse & { error?: string } = await profileRes.json();
+
+        if (!profileRes.ok) {
+          throw new Error(profileData.error ?? "Failed to profile run.");
+        }
+
+        const profileRun = profileData.run;
+        setRunId(profileRun.id);
+        setTargetFields(profileRun.targetFields);
+        setColumnProfiles(profileRun.columnProfiles);
+        updateStepStatus(1, "done");
+        if (profileData.warning) {
+          setWarningMessage(profileData.warning);
+        }
+
+        await new Promise((r) => setTimeout(r, 400));
+        setPhase("analyzing");
+        updateStepStatus(2, "processing");
+
+        const suggestRes = await fetch(`/api/mapping-runs/${profileRun.id}/suggest`, {
+          method: "POST",
+        });
+        const suggestData: SuggestResponse & { error?: string } = await suggestRes.json();
+
+        if (!suggestRes.ok) {
+          throw new Error(suggestData.error ?? "AI matching failed.");
+        }
+
+        updateStepStatus(2, "done");
+
+        const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
+        setMappings(suggested);
+        await new Promise((r) => setTimeout(r, 300));
+        updateStepStatus(3, "done");
+
+        await new Promise((r) => setTimeout(r, 300));
+        updateStepStatus(4, "done");
+
+        updateStepStatus(5, "processing");
+        await new Promise((r) => setTimeout(r, 2000));
+        updateStepStatus(5, "done");
+
+        setPhase("review");
+        return;
+      }
+
+      if (!uploadId || !templateId) {
+        setPhase("error");
+        setErrorMessage("Missing upload ID or template ID. Please go back and try again.");
+        return;
+      }
+
       const createRes = await fetch("/api/mapping-runs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -260,12 +311,12 @@ export function MappingWorkbench({
       const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
       setErrorMessage(msg);
     }
-  }, [uploadId, templateId, sheet, updateStepStatus]);
+  }, [uploadId, templateId, sheet, runId, updateStepStatus]);
 
   useEffect(() => {
     if (phase !== "init") return;
 
-    if (!uploadId || !templateId) {
+    if (!uploadId && !runId) {
       setPhase("error");
       setErrorMessage("Missing upload ID or template ID.");
       return;
@@ -276,7 +327,7 @@ export function MappingWorkbench({
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [phase, uploadId, templateId, runPhase]);
+  }, [phase, uploadId, templateId, runPhase, runId]);
 
   useEffect(() => {
     if (
@@ -360,7 +411,7 @@ export function MappingWorkbench({
       }
 
       toast.success("Output ready", { description: "Your mapped data is ready to export." });
-      onComplete?.(runId);
+      onComplete?.(runId, confirmData.mappingTemplateId);
     } catch (err) {
       setPhase("review");
       const msg = err instanceof Error ? err.message : "Confirmation failed.";

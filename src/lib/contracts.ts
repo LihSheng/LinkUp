@@ -7,9 +7,17 @@ export const jsonSchemaInputSchema = z.object({
 });
 
 export const createRunSchema = z.object({
-  uploadedFileId: z.string().min(1),
+  uploadedFileId: z.string().min(1).optional(),
   schemaTemplateId: z.string().min(1),
   sourceSheetName: z.string().optional().nullable(),
+  displayName: z.string().min(1).optional(),
+  mappingTemplateId: z.string().min(1).optional(),
+});
+
+export const updateRunSchema = z.object({
+  uploadedFileId: z.string().min(1).optional(),
+  sourceSheetName: z.string().optional().nullable(),
+  displayName: z.string().min(1).optional(),
 });
 
 export const confirmMappingSchema = z.object({
@@ -25,4 +33,9 @@ export const confirmMappingSchema = z.object({
       constantValue: z.string().nullable().optional(),
     }),
   ),
+});
+
+export const updateMappingTemplateSchema = z.object({
+  isFavorite: z.boolean().optional(),
+  name: z.string().min(1).optional(),
 });

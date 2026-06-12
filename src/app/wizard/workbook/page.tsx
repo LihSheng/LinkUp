@@ -58,6 +58,7 @@ export default function WorkbookStepPage() {
   const uploadId = searchParams.get("uploadId");
   const initialSheet = searchParams.get("sheet");
   const templateId = searchParams.get("templateId");
+  const runId = searchParams.get("runId");
   const { completeStep, isStepAccessible } = useWizardProgress();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -186,15 +187,28 @@ export default function WorkbookStepPage() {
         setPageState("success");
         setActivePanelTab("general");
         setVisibleSampleRowCount(5);
+
+        if (runId) {
+          await fetch(`/api/mapping-runs/${runId}`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              uploadedFileId: data.uploadedFile.id,
+              sourceSheetName: data.preview?.sourceSheetName ?? null,
+            }),
+          });
+        }
+
         const replaceParams = new URLSearchParams({ uploadId: data.uploadedFile.id });
         if (templateId) replaceParams.set("templateId", templateId);
+        if (runId) replaceParams.set("runId", runId);
         router.replace(`/wizard/workbook?${replaceParams.toString()}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed.");
         setPageState("error");
       }
     },
-    [router, templateId],
+    [router, templateId, runId],
   );
 
   const handleRemove = useCallback(() => {
@@ -207,8 +221,11 @@ export default function WorkbookStepPage() {
     setRestoredUploadId(null);
     setActivePanelTab("general");
     setVisibleSampleRowCount(5);
-    router.replace("/wizard/workbook");
-  }, [router]);
+    const params = new URLSearchParams();
+    if (templateId) params.set("templateId", templateId);
+    if (runId) params.set("runId", runId);
+    router.replace(`/wizard/workbook?${params.toString()}`);
+  }, [router, templateId, runId]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -294,10 +311,13 @@ export default function WorkbookStepPage() {
     if (templateId) {
       params.set("templateId", templateId);
     }
+    if (runId) {
+      params.set("runId", runId);
+    }
 
     completeStep(1);
     router.push(`/wizard/mapping?${params.toString()}`);
-  }, [completeStep, router, uploadedFile, selectedSheetName, templateId]);
+  }, [completeStep, router, uploadedFile, selectedSheetName, templateId, runId]);
 
   const visibleSampleRows = preview?.sampleRows.slice(0, visibleSampleRowCount) ?? [];
   const columnProfiles = preview?.columnProfiles ?? [];
@@ -608,7 +628,12 @@ export default function WorkbookStepPage() {
         primaryLabel="Next"
         primaryDisabled={!uploadedFile || showBusyState}
         secondaryLabel="Back"
-        onSecondary={() => router.push("/wizard/schema")}
+        onSecondary={() => {
+          const params = new URLSearchParams();
+          if (templateId) params.set("templateId", templateId);
+          if (runId) params.set("runId", runId);
+          router.push(`/wizard/schema?${params.toString()}`);
+        }}
       />
     </div>
   );

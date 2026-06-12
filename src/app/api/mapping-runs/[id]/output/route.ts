@@ -30,6 +30,13 @@ export async function POST(_: Request, context: RouteContext) {
     );
   }
 
+  if (!run.uploadedFile) {
+    return NextResponse.json(
+      { error: "No uploaded file attached to this run." },
+      { status: 400 },
+    );
+  }
+
   const workbook = await readAllRows({
     filePath: run.uploadedFile.storagePath,
     preferredSheetName: run.sourceSheetName,

@@ -13,6 +13,7 @@ export default function OutputStepPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const runId = searchParams.get("runId");
+  const mappingTemplateId = searchParams.get("mappingTemplateId");
   const { completeStep, isStepAccessible } = useWizardProgress();
 
   const { data, error, isLoading } = useSWR(
@@ -68,6 +69,7 @@ export default function OutputStepPage() {
       runData={data.run}
       onBack={handleBack}
       onFinish={handleFinish}
+      mappingTemplateId={mappingTemplateId ?? undefined}
     />
   );
 }

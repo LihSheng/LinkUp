@@ -19,7 +19,7 @@ export default function MappingStepPage() {
   const runId = searchParams.get("runId");
   const { completeStep, isStepAccessible } = useWizardProgress();
 
-  const { data: existingRun } = useSWR(
+  const { data: existingRun, isLoading: isRunLoading } = useSWR(
     runId ? `/api/mapping-runs/${runId}` : null,
     fetcher,
   );
@@ -35,21 +35,32 @@ export default function MappingStepPage() {
     if (uploadId) params.set("uploadId", uploadId);
     if (sheet) params.set("sheet", sheet);
     if (templateId) params.set("templateId", templateId);
+    if (runId) params.set("runId", runId);
     router.push(`/wizard/workbook?${params.toString()}`);
-  }, [router, uploadId, sheet, templateId]);
+  }, [router, uploadId, sheet, templateId, runId]);
 
-  const handleComplete = useCallback((runId?: string) => {
+  const handleComplete = useCallback((completedRunId?: string, mappingTemplateId?: string) => {
     completeStep(2);
     const params = new URLSearchParams(searchParams.toString());
-    if (runId && !params.has("runId")) params.set("runId", runId);
+    if (completedRunId && !params.has("runId")) params.set("runId", completedRunId);
+    if (mappingTemplateId) params.set("mappingTemplateId", mappingTemplateId);
     const qs = params.toString();
     router.push(`/wizard/output${qs ? `?${qs}` : ""}`);
   }, [completeStep, router, searchParams]);
 
-  const confirmedMapping = existingRun?.run?.confirmedMapping as { mappings?: FieldMapping[] } | null;
+  const run = existingRun?.run;
+  const confirmedMapping = run?.confirmedMapping as { mappings?: FieldMapping[] } | null;
   const initialMappings = confirmedMapping?.mappings;
-  const initialTargetFields = existingRun?.run?.targetFields as TargetField[] | undefined;
-  const initialColumnProfiles = existingRun?.run?.columnProfiles as ColumnProfile[] | undefined;
+  const initialTargetFields = run?.targetFields as TargetField[] | undefined;
+  const initialColumnProfiles = run?.columnProfiles as ColumnProfile[] | undefined;
+
+  if (runId && isRunLoading) {
+    return (
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <p className="text-sm text-[var(--color-muted)]">Loading draft...</p>
+      </div>
+    );
+  }
 
   return (
     <MappingWorkbench

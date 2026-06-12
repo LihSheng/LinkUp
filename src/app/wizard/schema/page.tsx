@@ -1,6 +1,6 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
@@ -23,6 +23,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "@/components/ui/sonner";
 import { WizardFooter } from "@/components/wizard/WizardFooter";
@@ -38,12 +39,32 @@ type SchemaTemplate = {
   jsonSchema: unknown;
 };
 
+type MappingTemplateItem = {
+  id: string;
+  name: string;
+  schemaTemplateId: string;
+  sourceSignature?: string | null;
+  confirmedMapping: unknown;
+  isFavorite: boolean;
+};
+
 type TemplateListResponse = {
   templates?: SchemaTemplate[];
 };
 
 type TemplateCreateResponse = {
   template: SchemaTemplate;
+};
+
+type CreateRunResponse = {
+  run: {
+    id: string;
+    draftToken: string;
+  };
+};
+
+type MappingTemplatesResponse = {
+  templates: MappingTemplateItem[];
 };
 
 async function readJson<T>(response: Response): Promise<T> {
@@ -73,17 +94,52 @@ const swrFetcher = async (url: string) => readJson<TemplateListResponse>(await f
 
 export default function SchemaStepPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const existingRunId = searchParams.get("runId");
+  const existingTemplateId = searchParams.get("templateId");
   const { completeStep, resetProgress } = useWizardProgress();
 
   useEffect(() => {
-    resetProgress();
-  }, [resetProgress]);
-  const [selected, setSelected] = useState<string | null>(null);
+    if (!existingRunId) {
+      resetProgress();
+    }
+  }, [resetProgress, existingRunId]);
+  const [selected, setSelected] = useState<string | null>(existingTemplateId ?? null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectedTemplateId, setInspectedTemplateId] = useState<string | null>(null);
   const [editingTemplate, setEditingTemplate] = useState<SchemaTemplate | null>(null);
   const [templatePendingDelete, setTemplatePendingDelete] = useState<SchemaTemplate | null>(null);
   const [isDeletingTemplate, setIsDeletingTemplate] = useState(false);
+
+  const [selectedFavoriteTemplateId, setSelectedFavoriteTemplateId] = useState<string | null>(null);
+  const [processName, setProcessName] = useState("");
+  const [triedContinue, setTriedContinue] = useState(false);
+  const [isCreatingDraft, setIsCreatingDraft] = useState(false);
+
+  useEffect(() => {
+    if (!existingRunId) return;
+
+    let cancelled = false;
+
+    async function restoreDraft() {
+      try {
+        const res = await fetch(`/api/mapping-runs/${existingRunId}`);
+        const data = await res.json();
+
+        if (!cancelled && data?.run?.displayName) {
+          setProcessName(data.run.displayName);
+        }
+      } catch {
+        // ignore restore failures
+      }
+    }
+
+    void restoreDraft();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [existingRunId]);
 
   const { data, mutate, isLoading, error } = useSWR("/api/schema-templates", swrFetcher, {
     revalidateOnFocus: false,
@@ -96,6 +152,22 @@ export default function SchemaStepPage() {
   const inspectedTemplate = useMemo(
     () => templates.find((template) => template.id === inspectedTemplateId) ?? null,
     [inspectedTemplateId, templates],
+  );
+
+  const { data: mappingTemplatesData } = useSWR<MappingTemplatesResponse>(
+    selectedTemplate ? `/api/schema-templates/${selectedTemplate.id}/templates` : null,
+    (url: string) => fetch(url).then((r) => r.json()),
+    { revalidateOnFocus: false },
+  );
+
+  const mappingTemplates = useMemo(
+    () => mappingTemplatesData?.templates ?? [],
+    [mappingTemplatesData],
+  );
+
+  const favoriteTemplates = useMemo(
+    () => mappingTemplates.filter((t) => t.isFavorite),
+    [mappingTemplates],
   );
 
   async function handleCreateTemplate(payload: {
@@ -225,6 +297,95 @@ export default function SchemaStepPage() {
     }
   }
 
+  const isUsingFavorite = selectedFavoriteTemplateId !== null;
+  const isUsingNewProcess = selectedTemplate !== null && !isUsingFavorite;
+  const processNameValid = processName.trim().length > 0;
+  const canContinue = isUsingFavorite || (isUsingNewProcess && processNameValid);
+
+  const finalDisplayName = isUsingFavorite
+    ? favoriteTemplates.find((t) => t.id === selectedFavoriteTemplateId)?.name ?? processName.trim()
+    : processName.trim();
+
+  const getStatusText = () => {
+    if (isUsingFavorite) {
+      const favTemplate = favoriteTemplates.find((t) => t.id === selectedFavoriteTemplateId);
+      return favTemplate ? `Reusing "${favTemplate.name}"` : "Select a schema template to continue";
+    }
+    if (isUsingNewProcess && processNameValid) {
+      return `Starting "${processName.trim()}"`;
+    }
+    if (selectedTemplate && !isUsingFavorite) {
+      return "Enter a process name to continue";
+    }
+    return "Select a schema template to continue";
+  };
+
+  async function handlePrimary() {
+    if (!selectedTemplate) {
+      toast.error("No template selected", {
+        description: "Please select a schema template before continuing.",
+      });
+      return;
+    }
+
+    if (!isUsingFavorite && !processNameValid) {
+      setTriedContinue(true);
+      toast.error("Process name required", {
+        description: "Enter a name for your new process, or select a favorited mapping template.",
+      });
+      return;
+    }
+
+    setTriedContinue(false);
+
+    if (existingRunId) {
+      completeStep(0);
+      const params = new URLSearchParams({
+        templateId: selectedTemplate.id,
+        runId: existingRunId,
+      });
+      if (searchParams.get("draftToken")) {
+        params.set("draftToken", searchParams.get("draftToken")!);
+      }
+      router.push(`/wizard/workbook?${params.toString()}`);
+      return;
+    }
+
+    setIsCreatingDraft(true);
+
+    try {
+      const createResult = await readJson<CreateRunResponse>(
+        await fetch("/api/mapping-runs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            schemaTemplateId: selectedTemplate.id,
+            displayName: finalDisplayName,
+          }),
+        }),
+      );
+
+      completeStep(0);
+      const params = new URLSearchParams({
+        templateId: selectedTemplate.id,
+        runId: createResult.run.id,
+      });
+      if (createResult.run.draftToken) {
+        params.set("draftToken", createResult.run.draftToken);
+      }
+      if (isUsingFavorite) {
+        params.set("mappingTemplateId", selectedFavoriteTemplateId!);
+      }
+      router.push(`/wizard/workbook?${params.toString()}`);
+    } catch (err) {
+      toast.error("Failed to create draft", {
+        description: err instanceof Error ? err.message : "Unable to start process.",
+      });
+    } finally {
+      setIsCreatingDraft(false);
+    }
+  }
+
   return (
     <div className="wizard-step-page">
       <div className="template-grid">
@@ -258,7 +419,12 @@ export default function SchemaStepPage() {
             <button
               type="button"
               aria-label={`Select ${template.name}`}
-              onClick={() => setSelected(template.id)}
+              onClick={() => {
+                setSelected(template.id);
+                setSelectedFavoriteTemplateId(null);
+                setProcessName("");
+                setTriedContinue(false);
+              }}
               style={{
                 position: "absolute",
                 inset: 0,
@@ -326,24 +492,75 @@ export default function SchemaStepPage() {
         </button>
       </div>
 
+      {selectedTemplate ? (
+        <div className="mt-6 space-y-6 max-w-3xl">
+          {favoriteTemplates.length > 0 ? (
+            <section>
+              <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-[0.08em] mb-3">
+                Reuse a saved mapping
+              </h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {favoriteTemplates.map((fav) => (
+                  <button
+                    key={fav.id}
+                    type="button"
+                    className={`text-left p-4 rounded-xl border transition-colors ${
+                      selectedFavoriteTemplateId === fav.id
+                        ? "border-[var(--color-ink)] bg-[rgba(28,28,28,0.04)]"
+                        : "border-[var(--color-border)] hover:border-[var(--color-ink-30)]"
+                    }`}
+                    onClick={() => {
+                      if (selectedFavoriteTemplateId === fav.id) {
+                        setSelectedFavoriteTemplateId(null);
+                      } else {
+                        setSelectedFavoriteTemplateId(fav.id);
+                        setProcessName("");
+                        setTriedContinue(false);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <svg viewBox="0 0 24 24" fill="currentColor" width="16" height="16" className="text-[var(--color-warning)] shrink-0">
+                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                      </svg>
+                      <span className="font-medium text-sm">{fav.name}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <section>
+            <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-[0.08em] mb-3">
+              Start new process
+            </h3>
+            <label className="grid gap-2">
+              <span className="text-sm font-medium">
+                Process name {!isUsingFavorite ? <span className="text-[var(--color-error)]">*</span> : null}
+              </span>
+              <Input
+                value={processName}
+                onChange={(event) => {
+                  setProcessName(event.target.value);
+                  setSelectedFavoriteTemplateId(null);
+                  setTriedContinue(false);
+                }}
+                placeholder="e.g. Monthly payroll import Q2 2026"
+                disabled={isUsingFavorite}
+                className={triedContinue && !processNameValid && !isUsingFavorite ? "border-red-500" : ""}
+              />
+            </label>
+          </section>
+        </div>
+      ) : null}
+
       <WizardFooter
-        statusText={
-          selectedTemplate
-            ? `Using "${selectedTemplate.name}"`
-            : "Select a schema template to continue"
-        }
-        statusReady={selectedTemplate !== null}
-        primaryLabel="Next"
-        onPrimary={() => {
-          if (!selectedTemplate) {
-            toast.error("No template selected", {
-              description: "Please select a schema template before continuing.",
-            });
-            return;
-          }
-          completeStep(0);
-          router.push(`/wizard/workbook?templateId=${selectedTemplate.id}`);
-        }}
+        statusText={getStatusText()}
+        statusReady={canContinue && !isCreatingDraft}
+        primaryLabel={isCreatingDraft ? "Creating draft..." : "Next"}
+        onPrimary={handlePrimary}
+        primaryDisabled={!canContinue || isCreatingDraft}
       />
 
       {isCreateModalOpen ? (

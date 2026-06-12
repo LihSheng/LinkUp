@@ -35,6 +35,7 @@ type MappingCompleteScreenProps = {
   runData: RunData;
   onBack: () => void;
   onFinish: () => void;
+  mappingTemplateId?: string;
 };
 
 function getRowIndex(instancePath: string): number | null {
@@ -106,12 +107,15 @@ export function MappingCompleteScreen({
   runData,
   onBack,
   onFinish,
+  mappingTemplateId,
 }: MappingCompleteScreenProps) {
   const output = runData.output;
-  const metrics = output ? getMetrics(output) : { rows: 0, errorCount: 0, valid: true };
+  const metrics = output ? getMetrics(output) : { rows: 0, errorCount: 0, valid: true, rowsWithErrors: new Set<number>(), validationRate: 100 };
   const errors = output ? getErrorList(output) : [];
   const fileName = runData.uploadedFile?.originalName ?? "mapped-data";
   const [showErrors, setShowErrors] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
 
   const handleJsonExport = useCallback(() => {
     if (!output?.jsonOutput) return;
@@ -124,6 +128,32 @@ export function MappingCompleteScreen({
     const baseName = fileName.replace(/\.[^.]+$/, "");
     downloadExcel(output.jsonOutput, `${baseName}-mapped.json`);
   }, [output, fileName]);
+
+  const handleToggleFavorite = useCallback(async () => {
+    if (!mappingTemplateId) return;
+
+    setIsTogglingFavorite(true);
+    const nextValue = !isFavorite;
+
+    try {
+      const res = await fetch(`/api/mapping-templates/${mappingTemplateId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ isFavorite: nextValue }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error((data as { error?: string }).error ?? "Failed to update favorite.");
+      }
+
+      setIsFavorite(nextValue);
+    } catch (err) {
+      // ignore toggle failures silently
+    } finally {
+      setIsTogglingFavorite(false);
+    }
+  }, [mappingTemplateId, isFavorite]);
 
   const jsonPreview =
     output?.jsonOutput && Array.isArray(output.jsonOutput)
@@ -328,6 +358,32 @@ export function MappingCompleteScreen({
         onPrimary={onFinish}
         secondaryLabel="Back to mapping"
         onSecondary={onBack}
+        leftSlot={
+          mappingTemplateId ? (
+            <button
+              type="button"
+              className="relative group flex items-center justify-center size-10 rounded-full border border-[var(--color-border)] bg-transparent cursor-pointer hover:bg-[rgba(28,28,28,0.04)] disabled:opacity-50"
+              onClick={handleToggleFavorite}
+              disabled={isTogglingFavorite}
+              aria-label={isFavorite ? "Remove from favorites" : "Mark as favorite for future reuse"}
+            >
+              <svg
+                viewBox="0 0 24 24"
+                fill={isFavorite ? "currentColor" : "none"}
+                width="18"
+                height="18"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                className={isFavorite ? "text-[var(--color-warning)]" : "text-[var(--color-muted)]"}
+              >
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+              </svg>
+              <span className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--color-ink)] text-white text-xs px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                {isFavorite ? "Remove from favorites" : "Mark as favorite for future reuse"}
+              </span>
+            </button>
+          ) : null
+        }
       />
     </div>
   );

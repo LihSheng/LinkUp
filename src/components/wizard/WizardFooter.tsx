@@ -10,6 +10,7 @@ type WizardFooterProps = {
   primaryDisabled?: boolean;
   secondaryLabel?: string;
   onSecondary?: () => void;
+  leftSlot?: React.ReactNode;
 };
 
 export function WizardFooter({
@@ -20,6 +21,7 @@ export function WizardFooter({
   primaryDisabled,
   secondaryLabel,
   onSecondary,
+  leftSlot,
 }: WizardFooterProps) {
   return (
     <section className="wizard-footer">
@@ -34,9 +36,12 @@ export function WizardFooter({
           <p>{statusText}</p>
         </div>
       </div>
-      <button type="button" className="primary-button" onClick={onPrimary} disabled={primaryDisabled}>
-        {primaryLabel}
-      </button>
+      <div className="flex items-center gap-3">
+        {leftSlot}
+        <button type="button" className="primary-button" onClick={onPrimary} disabled={primaryDisabled}>
+          {primaryLabel}
+        </button>
+      </div>
     </section>
   );
 }

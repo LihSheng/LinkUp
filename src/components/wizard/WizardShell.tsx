@@ -34,7 +34,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
   const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
   const { isStepAccessible } = useWizardProgress();
   const showSharedTopBar = true;
-  const requireBackConfirmation = activeStep.number === "02" || activeStep.number === "03";
+  const requireBackConfirmation = true;
 
   return (
     <div className="workspace-shell wizard-shell-frame">

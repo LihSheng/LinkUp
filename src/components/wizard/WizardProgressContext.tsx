@@ -7,14 +7,22 @@ type WizardProgressContextType = {
   completeStep: (stepIndex: number) => void;
   isStepAccessible: (stepIndex: number) => boolean;
   resetProgress: () => void;
+  activeRunId: string | null;
+  setActiveRunId: (runId: string | null) => void;
+  activeDraftToken: string | null;
+  setActiveDraftToken: (token: string | null) => void;
 };
 
 const WizardProgressContext = createContext<WizardProgressContextType | null>(null);
 const STORAGE_KEY = "linkup:wizard:completed-steps";
+const RUN_ID_KEY = "linkup:wizard:run-id";
+const DRAFT_TOKEN_KEY = "linkup:wizard:draft-token";
 const listeners = new Set<() => void>();
 const EMPTY_STEPS = new Set<number>();
 
 let completedStepsStore = new Set<number>();
+let activeRunIdStore: string | null = null;
+let activeDraftTokenStore: string | null = null;
 
 function readStoredSteps() {
   if (typeof window === "undefined") {
@@ -50,6 +58,48 @@ function writeStoredSteps(next: Set<number>) {
   listeners.forEach((listener) => listener());
 }
 
+function readStoredRunId() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(RUN_ID_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredRunId(runId: string | null) {
+  activeRunIdStore = runId;
+  if (typeof window !== "undefined") {
+    if (runId) {
+      window.sessionStorage.setItem(RUN_ID_KEY, runId);
+    } else {
+      window.sessionStorage.removeItem(RUN_ID_KEY);
+    }
+  }
+  listeners.forEach((listener) => listener());
+}
+
+function readStoredDraftToken() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.sessionStorage.getItem(DRAFT_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredDraftToken(token: string | null) {
+  activeDraftTokenStore = token;
+  if (typeof window !== "undefined") {
+    if (token) {
+      window.sessionStorage.setItem(DRAFT_TOKEN_KEY, token);
+    } else {
+      window.sessionStorage.removeItem(DRAFT_TOKEN_KEY);
+    }
+  }
+  listeners.forEach((listener) => listener());
+}
+
 function subscribe(listener: () => void) {
   listeners.add(listener);
   return () => {
@@ -67,6 +117,8 @@ function getServerSnapshot() {
 
 if (typeof window !== "undefined") {
   completedStepsStore = readStoredSteps();
+  activeRunIdStore = readStoredRunId();
+  activeDraftTokenStore = readStoredDraftToken();
 }
 
 export function WizardProgressProvider({ children }: { children: React.ReactNode }) {
@@ -90,8 +142,25 @@ export function WizardProgressProvider({ children }: { children: React.ReactNode
     writeStoredSteps(new Set<number>());
   }, []);
 
+  const setActiveRunId = useCallback((runId: string | null) => {
+    writeStoredRunId(runId);
+  }, []);
+
+  const setActiveDraftToken = useCallback((token: string | null) => {
+    writeStoredDraftToken(token);
+  }, []);
+
   return (
-    <WizardProgressContext.Provider value={{ completedSteps, completeStep, isStepAccessible, resetProgress }}>
+    <WizardProgressContext.Provider value={{
+      completedSteps,
+      completeStep,
+      isStepAccessible,
+      resetProgress,
+      activeRunId: activeRunIdStore,
+      setActiveRunId,
+      activeDraftToken: activeDraftTokenStore,
+      setActiveDraftToken,
+    }}>
       {children}
     </WizardProgressContext.Provider>
   );

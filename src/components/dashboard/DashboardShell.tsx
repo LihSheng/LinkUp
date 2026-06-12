@@ -11,14 +11,12 @@ import { SettingsDialog } from "@/components/dashboard/SettingsDialog";
 const sidebarItems = [
   { href: "/", label: "Dashboard", icon: "dashboard" },
   { href: "/wizard", label: "Wizard", icon: "wizard" },
-  { href: "/wizard/schema", label: "Active Schemas", icon: "schema" },
-  { href: "/wizard/mapping", label: "Mapping Tools", icon: "mapping" },
+  { href: "/mapping-templates", label: "Mapping Templates", icon: "templates" },
 ] as const;
 
 const topNavItems = [
   { href: "/", label: "Projects" },
-  { href: "/wizard/schema", label: "Schemas" },
-  { href: "/wizard/mapping", label: "Mappings" },
+  { href: "/mapping-templates", label: "Templates" },
   { href: "/wizard/output", label: "History" },
 ] as const;
 
@@ -54,10 +52,8 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                 <span className="dashboard-nav-icon" aria-hidden="true">
                   {item.icon === "dashboard" && (
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
-                      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
-                      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
-                      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+                      <path d="M12 3L4 9v12h16V9L12 3z" />
+                      <path d="M9 22V12h6v10" />
                     </svg>
                   )}
                   {item.icon === "wizard" && (
@@ -68,21 +64,13 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
                       <path d="M18 13l.8 1.6 1.7.8-1.7.8-.8 1.6-.8-1.6-1.7-.8 1.7-.8z" />
                     </svg>
                   )}
-                  {item.icon === "schema" && (
+
+                  {item.icon === "templates" && (
                     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M6 6.5h12M6 12h8M6 17.5h12" />
-                      <rect x="3.5" y="4.5" width="3" height="3" rx="0.75" />
-                      <rect x="3.5" y="10.5" width="3" height="3" rx="0.75" />
-                      <rect x="3.5" y="16.5" width="3" height="3" rx="0.75" />
-                    </svg>
-                  )}
-                  {item.icon === "mapping" && (
-                    <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                      <path d="M5 7h6M13 17h6M11 7v10M17 7v10" />
-                      <circle cx="5" cy="7" r="1.5" />
-                      <circle cx="19" cy="17" r="1.5" />
-                      <circle cx="11" cy="12" r="1.5" />
-                      <circle cx="17" cy="12" r="1.5" />
+                      <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+                      <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+                      <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+                      <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
                     </svg>
                   )}
 

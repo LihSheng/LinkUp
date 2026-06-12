@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { randomUUID } from "node:crypto";
 
 import { createRunSchema } from "@/lib/contracts";
 import { previewWorkbook } from "@/lib/excel/excel.service";
@@ -10,16 +11,44 @@ import type { CanonicalField } from "@/lib/excel/header-detection";
 export async function POST(request: Request) {
   const payload = createRunSchema.parse(await request.json());
 
-  const uploadedFile = await prisma.uploadedFile.findUnique({
-    where: { id: payload.uploadedFileId },
-  });
   const schemaTemplate = await prisma.schemaTemplate.findUnique({
     where: { id: payload.schemaTemplateId },
   });
 
-  if (!uploadedFile || !schemaTemplate) {
+  if (!schemaTemplate) {
     return NextResponse.json(
-      { error: "Uploaded file or schema template was not found." },
+      { error: "Schema template was not found." },
+      { status: 404 },
+    );
+  }
+
+  if (!payload.uploadedFileId) {
+    const draftToken = randomUUID();
+    const run = await prisma.mappingRun.create({
+      data: {
+        schemaTemplateId: schemaTemplate.id,
+        displayName: payload.displayName ?? null,
+        draftToken,
+        status: "draft",
+      },
+    });
+
+    return NextResponse.json({
+      run: {
+        ...run,
+        targetFields: flattenJsonSchema(schemaTemplate.jsonSchema),
+        schemaTemplate,
+      },
+    }, { status: 201 });
+  }
+
+  const uploadedFile = await prisma.uploadedFile.findUnique({
+    where: { id: payload.uploadedFileId },
+  });
+
+  if (!uploadedFile) {
+    return NextResponse.json(
+      { error: "Uploaded file was not found." },
       { status: 404 },
     );
   }
