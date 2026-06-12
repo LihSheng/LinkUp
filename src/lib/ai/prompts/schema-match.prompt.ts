@@ -1,4 +1,4 @@
-import type { SchemaMatchInput } from "@/lib/mapping/mapping.types";
+import type { FieldMapping, SchemaMatchInput } from "@/lib/mapping/mapping.types";
 
 export function buildSchemaMatchSystemPrompt() {
   return [
@@ -19,6 +19,8 @@ export function buildSchemaMatchSystemPrompt() {
     "4. Each source column should map to at most ONE target field. If two targets both match the same column best, prefer the target with the stronger semantic match.",
     "",
     "IMPORTANT: The targetPath in each mapping must be an EXACT path from the target JSON schema provided in the user prompt. Do not add or remove any prefix — copy the path verbatim from the schema's flattened field list.",
+    "",
+    "The user prompt may include pre-computed suggestions from header-name matching. Use these as starting points — confirm them if the sample data supports the match, or override if the data contradicts (e.g., a column named 'balance' that contains dates should NOT be matched to a number field). Empty columns with exact name matches should still be mapped.",
     "",
     "Example format (paths are illustrative — use actual paths from the input):",
     JSON.stringify({
@@ -52,6 +54,26 @@ export function buildSchemaMatchSystemPrompt() {
   ].join("\n");
 }
 
-export function buildSchemaMatchUserPrompt(input: SchemaMatchInput) {
+export function buildSchemaMatchUserPrompt(
+  input: SchemaMatchInput,
+  heuristicHints?: FieldMapping[],
+) {
+  if (heuristicHints && heuristicHints.length > 0) {
+    const hints = heuristicHints.map((m) => ({
+      targetPath: m.targetPath,
+      sourceColumn: m.sourceColumn,
+      confidence: m.confidence,
+      transform: m.transform,
+      reason: m.reason,
+    }));
+    return [
+      "Pre-computed suggestions from header-name matching (use as starting points, override if sample data contradicts):",
+      JSON.stringify(hints, null, 2),
+      "",
+      "Schema and column data:",
+      JSON.stringify(input, null, 2),
+    ].join("\n");
+  }
+
   return JSON.stringify(input, null, 2);
 }

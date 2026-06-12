@@ -50,11 +50,14 @@ export class AIService {
     );
     const maxTokens = computeMaxTokens(expectedTargetPaths.length);
 
+    const heuristicResult = buildHeuristicMapping(input);
+    const heuristicHints = heuristicResult.mappings.filter((m) => m.sourceColumn !== null);
+
     for (let attempt = 0; attempt <= MAX_AI_RETRIES; attempt++) {
       try {
         const providerResult = await this.provider.generateJson<SchemaMatchResult>({
           systemPrompt: buildSchemaMatchSystemPrompt(),
-          userPrompt: buildSchemaMatchUserPrompt(compactInput),
+          userPrompt: buildSchemaMatchUserPrompt(compactInput, heuristicHints),
           temperature: 0.1,
           maxTokens,
         });
