@@ -1,5 +1,7 @@
 import type { ColumnProfile, DetectedType } from "@/lib/mapping/mapping.types";
 
+const PROFILE_SAMPLE_COUNT = 20;
+
 function detectValueType(value: unknown): DetectedType {
   if (value === null || value === undefined || value === "") {
     return "empty";
@@ -38,6 +40,27 @@ function detectValueType(value: unknown): DetectedType {
   return "string";
 }
 
+function majorityType(types: DetectedType[]): DetectedType {
+  if (types.length === 0) return "empty";
+
+  const counts = new Map<DetectedType, number>();
+  for (const t of types) {
+    counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+
+  let bestType: DetectedType = "empty";
+  let bestCount = 0;
+  for (const [type, count] of counts) {
+    if (count > bestCount) {
+      bestCount = count;
+      bestType = type;
+    }
+  }
+
+  if (bestCount / types.length >= 0.7) return bestType;
+  return "mixed";
+}
+
 export function buildColumnProfiles(
   headers: string[],
   sampleRows: Record<string, unknown>[],
@@ -46,18 +69,15 @@ export function buildColumnProfiles(
     const samples = sampleRows
       .map((row) => row[header])
       .filter((value) => value !== undefined)
-      .slice(0, 5);
+      .slice(0, PROFILE_SAMPLE_COUNT);
 
     const valueTypes = sampleRows
-      .map((row) => detectValueType(row[header]))
-      .filter((value) => value !== "empty");
+      .flatMap((row) => {
+        const type = detectValueType(row[header]);
+        return type !== "empty" ? [type] : [];
+      });
 
-    const detectedType =
-      valueTypes.length === 0
-        ? "empty"
-        : new Set(valueTypes).size === 1
-          ? valueTypes[0]
-          : "mixed";
+    const detectedType = majorityType(valueTypes);
 
     const nullCount = sampleRows.filter((row) => {
       const value = row[header];

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
-import { Sparkles, Check, AlertTriangle, X, Eye, Circle } from "lucide-react";
+import { Sparkles, Check, AlertTriangle, X, Eye, Circle, RotateCcw } from "lucide-react";
 import clsx from "clsx";
 
 import { MappingReviewTable } from "@/components/MappingReviewTable";
@@ -117,6 +117,15 @@ function jsonPreviewFromMappings(mappings: FieldMapping[]): string {
   return JSON.stringify(obj, null, 2);
 }
 
+const DEFAULT_ACTIVITY_STEPS: ActivityStep[] = [
+  { id: 0, label: "Preparing your file...", status: "pending", elapsed: null },
+  { id: 1, label: "Reading uploaded columns...", status: "pending", elapsed: null },
+  { id: 2, label: "Finding matching fields...", status: "pending", elapsed: null },
+  { id: 3, label: "Checking mapping results...", status: "pending", elapsed: null },
+  { id: 4, label: "Mapping complete", status: "pending", elapsed: null },
+  { id: 5, label: "Preparing review summary...", status: "pending", elapsed: null },
+];
+
 export function MappingWorkbench({
   onBack,
   onComplete,
@@ -140,19 +149,12 @@ export function MappingWorkbench({
   const [targetFields, setTargetFields] = useState<TargetField[]>(initialTargetFields ?? []);
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>(initialColumnProfiles ?? []);
   const [mappings, setMappings] = useState<FieldMapping[]>(initialMappings ?? []);
-  const DEFAULT_STEPS: ActivityStep[] = [
-    { id: 0, label: "Preparing your file...", status: "pending", elapsed: null },
-    { id: 1, label: "Reading uploaded columns...", status: "pending", elapsed: null },
-    { id: 2, label: "Finding matching fields...", status: "pending", elapsed: null },
-    { id: 3, label: "Checking mapping results...", status: "pending", elapsed: null },
-    { id: 4, label: "Mapping complete", status: "pending", elapsed: null },
-    { id: 5, label: "Preparing review summary...", status: "pending", elapsed: null },
-  ];
 
-  const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(DEFAULT_STEPS);
+  const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(DEFAULT_ACTIVITY_STEPS);
   const [completedStepIds, setCompletedStepIds] = useState<Set<number>>(new Set());
   const [showManualButton, setShowManualButton] = useState(false);
   const [manualConfirmOpen, setManualConfirmOpen] = useState(false);
+  const [retriggerConfirmOpen, setRetriggerConfirmOpen] = useState(false);
   const stepStartTimes = useRef<Map<number, number>>(new Map());
   const [tick, setTick] = useState(0);
 
@@ -419,6 +421,55 @@ export function MappingWorkbench({
     }
   }, [runId, mappings, targetFields, onComplete]);
 
+  const handleRetriggerAutoMapping = useCallback(async () => {
+    if (!runId) return;
+
+    setPhase("analyzing");
+    setActivitySteps(DEFAULT_ACTIVITY_STEPS.map((s) => ({ ...s, status: "pending" as StepStatus, elapsed: null })));
+    setCompletedStepIds(new Set());
+    stepStartTimes.current.clear();
+
+    updateStepStatus(0, "done");
+    await new Promise((r) => setTimeout(r, 300));
+    updateStepStatus(1, "done");
+    await new Promise((r) => setTimeout(r, 300));
+    updateStepStatus(2, "processing");
+
+    try {
+      const suggestRes = await fetch(`/api/mapping-runs/${runId}/suggest`, {
+        method: "POST",
+      });
+      const suggestData: SuggestResponse & { error?: string } = await suggestRes.json();
+
+      if (!suggestRes.ok) {
+        throw new Error(suggestData.error ?? "AI matching failed.");
+      }
+
+      updateStepStatus(2, "done");
+      const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
+      setMappings(suggested);
+
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(3, "done");
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(4, "done");
+
+      updateStepStatus(5, "processing");
+      await new Promise((r) => setTimeout(r, 1500));
+      updateStepStatus(5, "done");
+
+      setPhase("review");
+      toast.success("Auto-mapping complete", {
+        description: "AI suggestions have been refreshed.",
+      });
+    } catch (err) {
+      setPhase("review");
+      toast.error("Auto-mapping failed", {
+        description: err instanceof Error ? err.message : "Could not refresh suggestions.",
+      });
+    }
+  }, [runId, updateStepStatus]);
+
   const autoMappedCount = mappings.filter((m) => m.sourceColumn && m.confidence >= 0.5).length;
   const needsReviewCount = mappings.filter((m) => m.sourceColumn && m.confidence < 0.5).length;
   const unmappedCount = mappings.filter((m) => !m.sourceColumn).length;
@@ -578,7 +629,7 @@ export function MappingWorkbench({
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={handleBack}>Back to upload</Button>
-          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); }}>
+          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); }}>
             Retry
           </Button>
           {runId && targetFields.length > 0 ? (
@@ -680,6 +731,42 @@ export function MappingWorkbench({
 
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
             <Badge variant="outline" className="rounded-full">Actions</Badge>
+
+            <Dialog open={retriggerConfirmOpen} onOpenChange={setRetriggerConfirmOpen}>
+              <DialogTrigger render={
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full justify-start rounded-xl"
+                  disabled={isBusy}
+                >
+                  <RotateCcw className="mr-2 h-4 w-4" />
+                  Retrigger auto-mapping
+                </Button>
+              } />
+              <DialogContent className="max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Retrigger auto-mapping?</DialogTitle>
+                </DialogHeader>
+                <p className="text-sm text-[var(--color-muted)]">
+                  This will replace your current mappings with new AI suggestions. Any manual changes you made will be lost.
+                </p>
+                <div className="mt-4 flex justify-end gap-3">
+                  <Button variant="outline" size="sm" onClick={() => setRetriggerConfirmOpen(false)}>
+                    Cancel
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setRetriggerConfirmOpen(false);
+                      handleRetriggerAutoMapping();
+                    }}
+                  >
+                    Yes, rerun mapping
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             <Dialog>
               <DialogTrigger render={<Button variant="outline" className="w-full justify-start rounded-xl" size="sm" />}>

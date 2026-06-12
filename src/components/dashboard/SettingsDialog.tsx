@@ -21,6 +21,10 @@ import {
   Settings2,
   Cpu,
   AlertTriangle,
+  Loader2,
+  CheckCircle2,
+  XCircle,
+  PlugZap,
 } from "lucide-react";
 
 type Appearance = "light" | "dark" | "system";
@@ -183,11 +187,23 @@ type SettingsDialogProps = {
   onClose: () => void;
 };
 
+type ConnectionTestStatus = "idle" | "testing" | "connected" | "failed";
+type ConnectionTestResult = {
+  status: ConnectionTestStatus;
+  provider?: string;
+  model?: string;
+  responseTimeMs?: number;
+  error?: string;
+};
+
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
   const [savedSettings, setSavedSettings] = useState<Settings>(loadSettings);
   const [stagedSettings, setStagedSettings] = useState<Settings>(savedSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("general");
   const [pendingClose, setPendingClose] = useState(false);
+  const [connectionTest, setConnectionTest] = useState<ConnectionTestResult>({
+    status: "idle",
+  });
 
   const isDirty = useMemo(
     () => JSON.stringify(stagedSettings) !== JSON.stringify(savedSettings),
@@ -241,6 +257,35 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     },
     [handleRequestClose]
   );
+
+  const handleTestConnection = useCallback(async () => {
+    setConnectionTest({ status: "testing" });
+    try {
+      const res = await fetch("/api/settings/test-connection", { method: "POST" });
+      const data = await res.json();
+      if (data.connected) {
+        setConnectionTest({
+          status: "connected",
+          provider: data.provider,
+          model: data.model,
+          responseTimeMs: data.responseTimeMs,
+        });
+      } else {
+        setConnectionTest({
+          status: "failed",
+          provider: data.provider,
+          model: data.model,
+          responseTimeMs: data.responseTimeMs,
+          error: data.error,
+        });
+      }
+    } catch (err) {
+      setConnectionTest({
+        status: "failed",
+        error: err instanceof Error ? err.message : "Failed to reach the server",
+      });
+    }
+  }, []);
 
 
   return (
@@ -538,6 +583,76 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           </button>
                         ))}
                       </div>
+                    </div>
+
+                    {/* Test Connection */}
+                    <div className="pt-2 border-t border-[var(--color-border)]">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <span className="text-sm text-[var(--color-muted)] font-normal">
+                            Connection test
+                          </span>
+                          <p className="text-xs text-[var(--color-muted)] mt-0.5 opacity-70">
+                            Verify the LLM provider is reachable
+                          </p>
+                        </div>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleTestConnection}
+                          disabled={connectionTest.status === "testing"}
+                          className="gap-1.5 shrink-0"
+                        >
+                          {connectionTest.status === "testing" ? (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin" />
+                              Testing...
+                            </>
+                          ) : (
+                            <>
+                              <PlugZap className="size-3.5" />
+                              Test connection
+                            </>
+                          )}
+                        </Button>
+                      </div>
+
+                      {connectionTest.status === "connected" && (
+                        <div className="mt-3 flex items-start gap-2 rounded-md border border-[rgba(21,128,61,0.18)] bg-[rgba(21,128,61,0.08)] px-3 py-2 text-sm">
+                          <CheckCircle2 className="size-4 shrink-0 text-[var(--color-success)] mt-px" />
+                          <div>
+                            <span className="font-medium text-[var(--color-success)]">
+                              Connected
+                            </span>
+                            <span className="text-[var(--color-muted)] ml-1">
+                              {connectionTest.provider} / {connectionTest.model}
+                              {connectionTest.responseTimeMs !== undefined &&
+                                ` (${connectionTest.responseTimeMs}ms)`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {connectionTest.status === "failed" && (
+                        <div className="mt-3 flex items-start gap-2 rounded-md border border-[rgba(186,26,26,0.18)] bg-[rgba(186,26,26,0.08)] px-3 py-2 text-sm">
+                          <XCircle className="size-4 shrink-0 text-[var(--color-error)] mt-px" />
+                          <div>
+                            <span className="font-medium text-[var(--color-error)]">
+                              Connection failed
+                            </span>
+                            {connectionTest.error && (
+                              <span className="text-[var(--color-error)] ml-1">
+                                — {connectionTest.error}
+                              </span>
+                            )}
+                            {connectionTest.responseTimeMs !== undefined && (
+                              <span className="text-[var(--color-muted)] ml-1">
+                                ({connectionTest.responseTimeMs}ms)
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>

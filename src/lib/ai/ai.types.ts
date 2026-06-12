@@ -3,6 +3,14 @@ export type ProviderJsonResponse<T> = {
   rawText: string;
 };
 
+export type TestConnectionResult = {
+  ok: boolean;
+  provider: string;
+  model: string;
+  responseTimeMs: number;
+  error?: string;
+};
+
 export interface LLMProvider {
   generateJson<T>(params: {
     systemPrompt: string;
@@ -10,4 +18,5 @@ export interface LLMProvider {
     temperature?: number;
     maxTokens?: number;
   }): Promise<ProviderJsonResponse<T>>;
+  testConnection(): Promise<TestConnectionResult>;
 }

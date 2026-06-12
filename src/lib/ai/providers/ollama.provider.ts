@@ -98,4 +98,54 @@ export class OllamaProvider implements LLMProvider {
       clearTimeout(timeout);
     }
   }
+
+  async testConnection() {
+    const startedAt = Date.now();
+    const controller = new AbortController();
+    const timeoutMs = 10000;
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(`${this.baseUrl}/api/tags`, {
+        method: "GET",
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        return {
+          ok: false,
+          provider: "ollama",
+          model: this.model,
+          responseTimeMs: Date.now() - startedAt,
+          error: `Server returned status ${response.status}`,
+        };
+      }
+
+      return {
+        ok: true,
+        provider: "ollama",
+        model: this.model,
+        responseTimeMs: Date.now() - startedAt,
+      };
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") {
+        return {
+          ok: false,
+          provider: "ollama",
+          model: this.model,
+          responseTimeMs: Date.now() - startedAt,
+          error: `Connection timed out after ${timeoutMs}ms`,
+        };
+      }
+      return {
+        ok: false,
+        provider: "ollama",
+        model: this.model,
+        responseTimeMs: Date.now() - startedAt,
+        error: error instanceof Error ? error.message : "Connection failed",
+      };
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
 }

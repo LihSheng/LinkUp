@@ -64,6 +64,19 @@ export async function POST(_: Request, context: RouteContext) {
     ...suggestDiagnostics,
   });
 
+  logBackendEvent("info", "suggest-route", "Mapping field details", {
+    runId: id,
+    algorithm: diagnostics.usedFallback ? "heuristic" : "ai",
+    retryCount: diagnostics.retryCount ?? 0,
+    fields: suggestion.mappings.map((m) => ({
+      targetPath: m.targetPath,
+      sourceColumn: m.sourceColumn ?? "(none)",
+      confidence: m.confidence,
+      transform: m.transform ?? "none",
+      reason: m.reason ?? "",
+    })),
+  });
+
   const updated = await prisma.mappingRun.update({
     where: { id },
     data: {
