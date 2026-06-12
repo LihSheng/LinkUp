@@ -155,12 +155,14 @@ export function MappingWorkbench({
 
   const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(DEFAULT_ACTIVITY_STEPS);
   const [completedStepIds, setCompletedStepIds] = useState<Set<number>>(new Set());
+  const [showSoftMessage, setShowSoftMessage] = useState(false);
   const [showManualButton, setShowManualButton] = useState(false);
   const [manualConfirmOpen, setManualConfirmOpen] = useState(false);
   const [retriggerConfirmOpen, setRetriggerConfirmOpen] = useState(false);
   const [retriggerCooldown, setRetriggerCooldown] = useState(0);
   const [heuristicComplete, setHeuristicComplete] = useState(false);
   const stepStartTimes = useRef<Map<number, number>>(new Map());
+  const processStartTimeRef = useRef<number>(0);
   const retriggerCooldownRef = useRef(0);
   const [tick, setTick] = useState(0);
 
@@ -194,6 +196,7 @@ export function MappingWorkbench({
 
   const runPhase = useCallback(async () => {
     setPhase("creating-run");
+    processStartTimeRef.current = Date.now();
     updateStepStatus(0, "done");
     await new Promise((r) => setTimeout(r, 350));
     updateStepStatus(1, "processing");
@@ -345,15 +348,31 @@ export function MappingWorkbench({
       phase !== "creating-run" &&
       phase !== "analyzing"
     ) {
+      setShowSoftMessage(false);
       setShowManualButton(false);
       return;
     }
-    setShowManualButton(false);
-    const timer = setTimeout(() => {
-      setShowManualButton(true);
-    }, 10000);
-    return () => clearTimeout(timer);
-  }, [phase]);
+
+    if (processStartTimeRef.current === 0) {
+      setShowSoftMessage(false);
+      setShowManualButton(false);
+      return;
+    }
+
+    const now = Date.now();
+    const elapsedMs = now - processStartTimeRef.current;
+    const columnCount = columnProfiles.length;
+    const targetFieldCount = targetFields.length;
+
+    let threshold = 25_000;
+
+    if (columnCount > 50) threshold += 10_000;
+    if (columnCount > 100) threshold += 15_000;
+    if (targetFieldCount > 50) threshold += 10_000;
+
+    setShowSoftMessage(elapsedMs >= 10_000);
+    setShowManualButton(elapsedMs >= threshold);
+  }, [tick, phase, columnProfiles, targetFields]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -442,6 +461,7 @@ export function MappingWorkbench({
     retriggerCooldownRef.current = Date.now() + 30000;
     setRetriggerCooldown(30);
 
+    processStartTimeRef.current = Date.now();
     setPhase("analyzing");
     setActivitySteps(DEFAULT_ACTIVITY_STEPS.map((s) => ({ ...s, status: "pending" as StepStatus, elapsed: null })));
     setCompletedStepIds(new Set());
@@ -553,24 +573,30 @@ export function MappingWorkbench({
             </div>
           </div>
 
+          {showSoftMessage && (
+            <p className="text-sm text-[var(--color-muted)] text-center mt-4">
+              Still matching your columns. Larger or more complex files may take longer.
+            </p>
+          )}
+
           {showManualButton && runId && targetFields.length > 0 ? (
             <div className="absolute right-4 bottom-4">
               <Dialog open={manualConfirmOpen} onOpenChange={setManualConfirmOpen}>
                 <DialogTrigger render={
-                  <button className="text-[0.7rem] text-[var(--color-muted)] underline-offset-2 underline cursor-pointer bg-transparent border-none p-0 hover:text-[var(--color-ink)] transition-colors">
-                    Taking longer than expected?
-                  </button>
+                  <Button variant="outline" size="sm">
+                    Continue manually
+                  </Button>
                 } />
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Switch to manual mapping?</DialogTitle>
+                    <DialogTitle>Continue with manual mapping?</DialogTitle>
                   </DialogHeader>
                   <p className="text-sm text-[var(--color-muted)]">
-                    Schema mapping is still in progress. If you switch now, current suggestions will be discarded and you can map each column manually.
+                    Automatic mapping is still running. If you continue manually, any incomplete suggestions will be discarded and you can map each column yourself.
                   </p>
                   <div className="mt-4 flex justify-end gap-3">
                     <Button variant="outline" size="sm" onClick={() => setManualConfirmOpen(false)}>
-                      Cancel
+                      Keep waiting
                     </Button>
                     <Button
                       size="sm"
@@ -586,11 +612,12 @@ export function MappingWorkbench({
                           })),
                         );
                         setManualConfirmOpen(false);
+                        setShowSoftMessage(false);
                         setShowManualButton(false);
                         setPhase("review");
                       }}
                     >
-                      Yes, map manually
+                      Continue manually
                     </Button>
                   </div>
                 </DialogContent>
@@ -648,7 +675,7 @@ export function MappingWorkbench({
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={handleBack}>Back to upload</Button>
-          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); retriggerCooldownRef.current = 0; setRetriggerCooldown(0); setHeuristicComplete(false); }}>
+          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); processStartTimeRef.current = 0; retriggerCooldownRef.current = 0; setRetriggerCooldown(0); setHeuristicComplete(false); }}>
             Retry
           </Button>
           {runId && targetFields.length > 0 ? (

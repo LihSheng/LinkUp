@@ -1,11 +1,13 @@
 "use client";
 
+import { type ColumnDef } from "@tanstack/react-table";
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
 import useSWR from "swr";
 import { LayoutGrid, RefreshCcw, Search, Star } from "lucide-react";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { DataTable } from "@/components/DataTable";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -180,6 +182,103 @@ export default function MappingTemplatesPage() {
     [mutate],
   );
 
+  const columns = useMemo<ColumnDef<MappingTemplateItem, unknown>[]>(
+    () => [
+      {
+        id: "name",
+        accessorFn: (row) => row.name,
+        header: "Name",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              type="button"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/80 text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
+              onClick={() => void handleToggleFavorite(row.original)}
+              disabled={favoriteLoadingId === row.original.id}
+              aria-label={row.original.isFavorite ? "Remove from favorites" : "Mark as favorite"}
+              aria-pressed={row.original.isFavorite}
+            >
+              <Star
+                className="h-3.5 w-3.5"
+                fill={row.original.isFavorite ? "currentColor" : "none"}
+              />
+            </button>
+            <span className="truncate font-medium">{row.original.name}</span>
+          </div>
+        ),
+      },
+      {
+        id: "schema",
+        accessorFn: (row) => row.schemaTemplate.name,
+        header: "Schema",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span>{row.original.schemaTemplate.name}</span>
+        ),
+      },
+      {
+        id: "sourceSignature",
+        accessorFn: (row) => describeSourceSignature(row.sourceSignature),
+        header: "Source Signature",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="text-[var(--color-muted)]">
+            {describeSourceSignature(row.original.sourceSignature)}
+          </span>
+        ),
+      },
+      {
+        id: "mappings",
+        accessorFn: (row) => countMappings(row.confirmedMapping),
+        header: "Mappings",
+        enableSorting: true,
+        cell: ({ row }) => (
+          <span className="tabular-nums">
+            {countMappings(row.original.confirmedMapping)}
+          </span>
+        ),
+      },
+      {
+        id: "updatedAt",
+        accessorFn: (row) => row.updatedAt,
+        header: "Updated",
+        enableSorting: true,
+        sortingFn: "datetime",
+        cell: ({ row }) => (
+          <span className="text-[var(--color-muted)] whitespace-nowrap">
+            {formatDate(row.original.updatedAt)}
+          </span>
+        ),
+      },
+      {
+        id: "actions",
+        header: "",
+        enableSorting: false,
+        cell: ({ row }) => (
+          <div className="flex items-center justify-end gap-2">
+            <span
+              className={`rounded-full border px-2.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] whitespace-nowrap ${
+                row.original.isFavorite
+                  ? "border-[rgba(118,96,35,0.18)] bg-[rgba(255,214,102,0.12)] text-[rgba(118,96,35,1)]"
+                  : "border-[var(--dashboard-panel-border)] bg-[rgba(255,255,255,0.7)] text-[var(--color-muted)]"
+              }`}
+            >
+              {row.original.isFavorite ? "Favorite" : "Saved"}
+            </span>
+            <Link
+              href={`/wizard/schema?templateId=${row.original.schemaTemplate.id}`}
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              Open schema
+            </Link>
+          </div>
+        ),
+      },
+    ],
+    [favoriteLoadingId, handleToggleFavorite],
+  );
+
   return (
     <DashboardShell>
       <div className="dashboard-page">
@@ -271,24 +370,18 @@ export default function MappingTemplatesPage() {
           </div>
 
           {isLoading ? (
-            <div className="grid gap-4 xl:grid-cols-3">
-              {Array.from({ length: 3 }).map((_, index) => (
-                <div
-                  key={index}
-                  className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5"
-                >
-                  <Skeleton className="h-5 w-2/3" />
-                  <Skeleton className="mt-4 h-4 w-full" />
-                  <Skeleton className="mt-2 h-4 w-4/5" />
-                  <Skeleton className="mt-6 h-24 w-full" />
-                </div>
-              ))}
+            <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-8">
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, index) => (
+                  <Skeleton key={index} className="h-10 w-full" />
+                ))}
+              </div>
             </div>
           ) : error ? (
             <div className="rounded-2xl border border-[rgba(180,60,48,0.18)] bg-[rgba(180,60,48,0.05)] p-5 text-sm text-[var(--color-ink)]">
               Failed to load mapping templates.
             </div>
-          ) : filteredTemplates.length === 0 ? (
+          ) : filteredTemplates.length === 0 && templates.length > 0 ? (
             <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
               <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
                 <LayoutGrid className="h-5 w-5" />
@@ -300,94 +393,24 @@ export default function MappingTemplatesPage() {
                 Clear the filter or finish a mapping run to create the first reusable template.
               </p>
             </div>
-          ) : (
-            <div className="grid gap-4 xl:grid-cols-3">
-              {filteredTemplates.map((template) => {
-                const mappingCount = countMappings(template.confirmedMapping);
-                const sourceSignatureSummary = describeSourceSignature(template.sourceSignature);
-
-                return (
-                  <article
-                    key={template.id}
-                    className="group rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5 shadow-[0_1px_0_rgba(255,255,255,0.7)_inset] transition-transform duration-200 hover:-translate-y-0.5 hover:border-[color-mix(in_srgb,var(--dashboard-panel-border)_75%,var(--color-ink)_25%)]"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-                          {template.schemaTemplate.name}
-                        </p>
-                        <h3 className="mt-2 truncate font-[var(--font-display)] text-[1.55rem] leading-tight tracking-[-0.03em] text-[var(--color-ink)]">
-                          {template.name}
-                        </h3>
-                      </div>
-
-                      <button
-                        type="button"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/80 text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
-                        onClick={() => void handleToggleFavorite(template)}
-                        disabled={favoriteLoadingId === template.id}
-                        aria-label={template.isFavorite ? "Remove from favorites" : "Mark as favorite"}
-                        aria-pressed={template.isFavorite}
-                      >
-                        <Star
-                          className="h-4 w-4"
-                          fill={template.isFavorite ? "currentColor" : "none"}
-                        />
-                      </button>
-                    </div>
-
-                    <div className="mt-4 grid gap-3 text-sm text-[var(--color-muted)]">
-                      <div className="rounded-xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.7)] p-3">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-                          Source signature
-                        </div>
-                        <div className="mt-2 text-[0.92rem] leading-6 text-[var(--color-ink)]">
-                          {sourceSignatureSummary}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="rounded-xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.7)] p-3">
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-                            Rules
-                          </div>
-                          <div className="mt-2 text-[0.92rem] text-[var(--color-ink)]">
-                            {mappingCount} mapping{mappingCount === 1 ? "" : "s"}
-                          </div>
-                        </div>
-                        <div className="rounded-xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.7)] p-3">
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-                            Updated
-                          </div>
-                          <div className="mt-2 text-[0.92rem] text-[var(--color-ink)]">
-                            {formatDate(template.updatedAt)}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                      <span
-                        className={`rounded-full border px-3 py-1 text-xs font-semibold uppercase tracking-[0.12em] ${
-                          template.isFavorite
-                            ? "border-[rgba(118,96,35,0.18)] bg-[rgba(255,214,102,0.12)] text-[rgba(118,96,35,1)]"
-                            : "border-[var(--dashboard-panel-border)] bg-[rgba(255,255,255,0.7)] text-[var(--color-muted)]"
-                        }`}
-                      >
-                        {template.isFavorite ? "Favorite" : "Saved"}
-                      </span>
-
-                      <Link
-                        href={`/wizard/schema?templateId=${template.schemaTemplate.id}`}
-                        className={buttonVariants({ variant: "outline", size: "sm" })}
-                      >
-                        Open schema
-                      </Link>
-                    </div>
-                  </article>
-                );
-              })}
+          ) : filteredTemplates.length === 0 ? (
+            <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
+                <LayoutGrid className="h-5 w-5" />
+              </div>
+              <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
+                No templates yet
+              </h3>
+              <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
+                Finish a mapping run to create your first reusable template.
+              </p>
             </div>
+          ) : (
+            <DataTable
+              columns={columns}
+              data={filteredTemplates}
+              globalFilter={query}
+            />
           )}
         </section>
       </div>

@@ -1,38 +1,11 @@
 import Link from "next/link";
 
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
+import { getDashboardData } from "@/lib/dashboard/dashboard.service";
 
-const recentProjects = [
-  {
-    title: "User Profiles",
-    detail: "Last synced 2 hours ago",
-    badge: "98% MATCH",
-    progress: 96,
-    icon: "user",
-  },
-  {
-    title: "Sales Data",
-    detail: "Archive version 2.4",
-    badge: "COMPLETED",
-    progress: 100,
-    icon: "chart",
-  },
-  {
-    title: "Customer Feedback",
-    detail: "Processing 12,400 rows...",
-    badge: "IN PROGRESS",
-    progress: 42,
-    icon: "message",
-  },
-] as const;
+export const dynamic = "force-dynamic";
 
-const metrics = [
-  { value: "124", unit: "", label: "GLOBAL MAPPINGS" },
-  { value: "96.4", unit: "%", label: "GLOBAL AI ACCURACY" },
-  { value: "42", unit: "hrs", label: "TOTAL TIME SAVED" },
-] as const;
-
-function ProjectIcon({ icon }: { icon: (typeof recentProjects)[number]["icon"] }) {
+function ProjectIcon({ icon }: { icon: "user" | "chart" | "message" }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
       {icon === "user" && (
@@ -59,14 +32,17 @@ function ProjectIcon({ icon }: { icon: (typeof recentProjects)[number]["icon"] }
   );
 }
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { metrics, recentRuns, summary } = await getDashboardData();
+  const footerYear = new Date().getFullYear();
+
   return (
     <DashboardShell>
       <div className="dashboard-page">
         <section className="dashboard-hero">
           <h1>Ready to start mapping?</h1>
           <p className="dashboard-lede">
-            Our AI engine is standing by to align your schemas.
+            {summary.uploadedFiles} uploads, {summary.mappingRuns} mapping runs, and {summary.generatedOutputs} generated outputs are already in the database.
           </p>
         </section>
 
@@ -113,8 +89,8 @@ export default function HomePage() {
           </div>
 
           <div className="dashboard-project-grid">
-            {recentProjects.map((project) => (
-              <article key={project.title} className="dashboard-project-card">
+            {recentRuns.map((project) => (
+              <article key={project.id} className="dashboard-project-card">
                 <div className="dashboard-project-topline">
                   <div className="dashboard-project-icon" aria-hidden="true">
                     <ProjectIcon icon={project.icon} />
@@ -132,7 +108,7 @@ export default function HomePage() {
         </section>
 
         <footer className="dashboard-footer">
-          <p>&#xA9; 2024 LinkUp Intelligence. Editorial Minimalist Design.</p>
+          <p>&#xA9; {footerYear} LinkUp.</p>
           <div className="dashboard-footer-links">
             <Link href="/wizard/schema">Privacy Policy</Link>
             <Link href="/wizard/mapping">Terms of Service</Link>

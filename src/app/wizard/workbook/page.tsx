@@ -218,14 +218,15 @@ export default function WorkbookStepPage() {
     setFileSize(0);
     setPageState("idle");
     setError(null);
-    setRestoredUploadId(null);
+    setRestoredUploadId(uploadId);
+    setIsRestoring(false);
     setActivePanelTab("general");
     setVisibleSampleRowCount(5);
     const params = new URLSearchParams();
     if (templateId) params.set("templateId", templateId);
     if (runId) params.set("runId", runId);
     router.replace(`/wizard/workbook?${params.toString()}`);
-  }, [router, templateId, runId]);
+  }, [router, templateId, runId, uploadId]);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
