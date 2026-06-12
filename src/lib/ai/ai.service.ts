@@ -16,6 +16,7 @@ import type { SchemaMatchInput, SchemaMatchResult } from "@/lib/mapping/mapping.
 const MAX_AI_RETRIES = 2;
 const BASE_TOKEN_BUDGET = 1200;
 const TOKENS_PER_FIELD = 120;
+const HEURISTIC_SKIP_THRESHOLD = 1.0;
 
 export type SchemaSuggestionDiagnostics = {
   rawPreview: string | null;
@@ -26,6 +27,7 @@ export type SchemaSuggestionDiagnostics = {
   warningCount: number;
   fallbackReason?: string;
   retryCount?: number;
+  heuristicComplete?: boolean;
 };
 
 function computeMaxTokens(fieldCount: number): number {
@@ -52,6 +54,33 @@ export class AIService {
 
     const heuristicResult = buildHeuristicMapping(input);
     const heuristicHints = heuristicResult.mappings.filter((m) => m.sourceColumn !== null);
+
+    const allFieldsMapped =
+      heuristicHints.length === expectedTargetPaths.length &&
+      heuristicHints.every((m) => m.confidence >= HEURISTIC_SKIP_THRESHOLD);
+
+    if (allFieldsMapped) {
+      const completed = ensureAllTargetPaths({
+        result: heuristicResult,
+        requiredPaths: expectedTargetPaths,
+      });
+      logBackendEvent("info", "ai-service", "All fields mapped heuristically, skipping LLM", {
+        durationMs: Date.now() - startedAt,
+        mappingCount: completed.mappings.length,
+      });
+      return {
+        result: completed,
+        diagnostics: {
+          rawPreview: null,
+          usedFallback: false,
+          normalizedResponse: false,
+          durationMs: Date.now() - startedAt,
+          mappingCount: completed.mappings.length,
+          warningCount: completed.warnings.length,
+          heuristicComplete: true,
+        },
+      };
+    }
 
     for (let attempt = 0; attempt <= MAX_AI_RETRIES; attempt++) {
       try {

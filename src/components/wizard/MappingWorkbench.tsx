@@ -68,6 +68,9 @@ type SuggestResponse = {
     suggestedMapping: { mappings: FieldMapping[] };
     targetFields: TargetField[];
     status: string;
+    suggestDiagnostics?: {
+      heuristicComplete?: boolean;
+    };
   };
 };
 
@@ -155,7 +158,10 @@ export function MappingWorkbench({
   const [showManualButton, setShowManualButton] = useState(false);
   const [manualConfirmOpen, setManualConfirmOpen] = useState(false);
   const [retriggerConfirmOpen, setRetriggerConfirmOpen] = useState(false);
+  const [retriggerCooldown, setRetriggerCooldown] = useState(0);
+  const [heuristicComplete, setHeuristicComplete] = useState(false);
   const stepStartTimes = useRef<Map<number, number>>(new Map());
+  const retriggerCooldownRef = useRef(0);
   const [tick, setTick] = useState(0);
 
   const updateStepStatus = useCallback((stepId: number, status: StepStatus) => {
@@ -227,8 +233,9 @@ export function MappingWorkbench({
 
         updateStepStatus(2, "done");
 
-        const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
-        setMappings(suggested);
+        const suggested2 = suggestData.run.suggestedMapping?.mappings ?? [];
+        setMappings(suggested2);
+        setHeuristicComplete(suggestData.run.suggestDiagnostics?.heuristicComplete ?? false);
         await new Promise((r) => setTimeout(r, 300));
         updateStepStatus(3, "done");
 
@@ -287,16 +294,17 @@ export function MappingWorkbench({
       const suggestRes = await fetch(`/api/mapping-runs/${run.id}/suggest`, {
         method: "POST",
       });
-      const suggestData: SuggestResponse & { error?: string } = await suggestRes.json();
+      const suggestData2: SuggestResponse & { error?: string } = await suggestRes.json();
 
       if (!suggestRes.ok) {
-        throw new Error(suggestData.error ?? "AI matching failed.");
+        throw new Error(suggestData2.error ?? "AI matching failed.");
       }
 
       updateStepStatus(2, "done");
 
-      const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
+      const suggested = suggestData2.run.suggestedMapping?.mappings ?? [];
       setMappings(suggested);
+      setHeuristicComplete(suggestData2.run.suggestDiagnostics?.heuristicComplete ?? false);
       await new Promise((r) => setTimeout(r, 300));
       updateStepStatus(3, "done");
 
@@ -350,6 +358,13 @@ export function MappingWorkbench({
   useEffect(() => {
     const interval = setInterval(() => {
       setTick((t) => t + 1);
+      if (retriggerCooldownRef.current > 0) {
+        const remaining = Math.max(0, Math.ceil((retriggerCooldownRef.current - Date.now()) / 1000));
+        setRetriggerCooldown(remaining);
+        if (remaining === 0) {
+          retriggerCooldownRef.current = 0;
+        }
+      }
     }, 1000);
     return () => clearInterval(interval);
   }, []);
@@ -424,6 +439,9 @@ export function MappingWorkbench({
   const handleRetriggerAutoMapping = useCallback(async () => {
     if (!runId) return;
 
+    retriggerCooldownRef.current = Date.now() + 30000;
+    setRetriggerCooldown(30);
+
     setPhase("analyzing");
     setActivitySteps(DEFAULT_ACTIVITY_STEPS.map((s) => ({ ...s, status: "pending" as StepStatus, elapsed: null })));
     setCompletedStepIds(new Set());
@@ -446,8 +464,9 @@ export function MappingWorkbench({
       }
 
       updateStepStatus(2, "done");
-      const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
-      setMappings(suggested);
+      const suggested3 = suggestData.run.suggestedMapping?.mappings ?? [];
+      setMappings(suggested3);
+      setHeuristicComplete(suggestData.run.suggestDiagnostics?.heuristicComplete ?? false);
 
       await new Promise((r) => setTimeout(r, 300));
       updateStepStatus(3, "done");
@@ -629,7 +648,7 @@ export function MappingWorkbench({
 
         <div className="flex gap-3">
           <Button variant="outline" onClick={handleBack}>Back to upload</Button>
-          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); }}>
+          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); retriggerCooldownRef.current = 0; setRetriggerCooldown(0); setHeuristicComplete(false); }}>
             Retry
           </Button>
           {runId && targetFields.length > 0 ? (
@@ -737,11 +756,15 @@ export function MappingWorkbench({
                 <Button
                   variant="outline"
                   size="sm"
-                  className="w-full justify-start rounded-xl"
-                  disabled={isBusy}
+                  className="w-full justify-start rounded-xl whitespace-nowrap"
+                  disabled={isBusy || retriggerCooldown > 0 || heuristicComplete}
                 >
-                  <RotateCcw className="mr-2 h-4 w-4" />
-                  Retrigger auto-mapping
+                  <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
+                  {heuristicComplete
+                    ? "Matched — no retrigger needed"
+                    : retriggerCooldown > 0
+                      ? `Retrigger (${retriggerCooldown}s)`
+                      : "Retrigger auto-mapping"}
                 </Button>
               } />
               <DialogContent className="max-w-md">
