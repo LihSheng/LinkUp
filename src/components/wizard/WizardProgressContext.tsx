@@ -6,6 +6,7 @@ type WizardProgressContextType = {
   completedSteps: Set<number>;
   completeStep: (stepIndex: number) => void;
   isStepAccessible: (stepIndex: number) => boolean;
+  resetProgress: () => void;
 };
 
 const WizardProgressContext = createContext<WizardProgressContextType | null>(null);
@@ -85,8 +86,12 @@ export function WizardProgressProvider({ children }: { children: React.ReactNode
     [completedSteps],
   );
 
+  const resetProgress = useCallback(() => {
+    writeStoredSteps(new Set<number>());
+  }, []);
+
   return (
-    <WizardProgressContext.Provider value={{ completedSteps, completeStep, isStepAccessible }}>
+    <WizardProgressContext.Provider value={{ completedSteps, completeStep, isStepAccessible, resetProgress }}>
       {children}
     </WizardProgressContext.Provider>
   );

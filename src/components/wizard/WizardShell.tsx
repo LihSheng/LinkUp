@@ -19,6 +19,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
   const { isStepAccessible } = useWizardProgress();
+  const showSharedTopBar = true;
 
   return (
     <div className="workspace-shell wizard-shell-frame">
@@ -79,13 +80,14 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="wizard-main-shell">
-        <WizardTopBar
-          stepNumber={`Step ${activeStep.number}`}
-          title={activeStep.title}
-          description={activeStep.description}
-          requireBackConfirmation={activeStep.number === "02" || activeStep.number === "03"}
-        />
-
+        {showSharedTopBar ? (
+          <WizardTopBar
+            stepNumber={`Step ${activeStep.number}`}
+            title={activeStep.title}
+            description={activeStep.description}
+            requireBackConfirmation={activeStep.number === "02" || activeStep.number === "03"}
+          />
+        ) : null}
         <main className="wizard-content">{children}</main>
       </div>
     </div>

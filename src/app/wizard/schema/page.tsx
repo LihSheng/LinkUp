@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import useSWR from "swr";
 
 import {
@@ -73,7 +73,11 @@ const swrFetcher = async (url: string) => readJson<TemplateListResponse>(await f
 
 export default function SchemaStepPage() {
   const router = useRouter();
-  const { completeStep } = useWizardProgress();
+  const { completeStep, resetProgress } = useWizardProgress();
+
+  useEffect(() => {
+    resetProgress();
+  }, [resetProgress]);
   const [selected, setSelected] = useState<string | null>(null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectedTemplateId, setInspectedTemplateId] = useState<string | null>(null);
@@ -338,7 +342,7 @@ export default function SchemaStepPage() {
             return;
           }
           completeStep(0);
-          router.push("/wizard/workbook");
+          router.push(`/wizard/workbook?templateId=${selectedTemplate.id}`);
         }}
       />
 

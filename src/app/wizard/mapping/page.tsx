@@ -1,14 +1,17 @@
 "use client";
 
-import { useEffect } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-import { WizardStepPage } from "@/components/wizard/WizardStepPage";
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
+import { MappingWorkbench } from "@/components/wizard/MappingWorkbench";
 
 export default function MappingStepPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const uploadId = searchParams.get("uploadId");
+  const sheet = searchParams.get("sheet");
+  const templateId = searchParams.get("templateId");
   const { completeStep, isStepAccessible } = useWizardProgress();
 
   useEffect(() => {
@@ -17,31 +20,23 @@ export default function MappingStepPage() {
     }
   }, [isStepAccessible, router]);
 
+  const handleBack = useCallback(() => {
+    const params = new URLSearchParams();
+    if (uploadId) params.set("uploadId", uploadId);
+    if (sheet) params.set("sheet", sheet);
+    if (templateId) params.set("templateId", templateId);
+    router.push(`/wizard/workbook?${params.toString()}`);
+  }, [router, uploadId, sheet, templateId]);
+
+  const handleComplete = useCallback(() => {
+    completeStep(2);
+    router.push("/wizard/output");
+  }, [completeStep, router]);
+
   return (
-    <WizardStepPage
-      step="Step 3"
-      title="Map fields"
-      description="This is where the matching interface will eventually live in the wizard. For now, the existing full matching experience remains available in the lab."
-      note="When we split the old screen into pages, this route will host the mapping table, AI suggestions, and review state."
-      statusText="Review and confirm field mappings"
-      stats={[
-        { label: "Mapped", value: "0/12" },
-        { label: "Review", value: "0" },
-        { label: "Duplicates", value: "0" },
-      ]}
-      onContinue={() => {
-        completeStep(2);
-        router.push("/wizard/output");
-      }}
-      onBack={() => router.push("/wizard/workbook")}
-    >
-      <div className="wizard-placeholder">
-        <strong>Mapping workspace placeholder</strong>
-        <p>
-          The full schema-matching engine is still available in{" "}
-          <Link href="/studio">the matching lab</Link> while this page remains a skeleton.
-        </p>
-      </div>
-    </WizardStepPage>
+    <MappingWorkbench
+      onBack={handleBack}
+      onComplete={handleComplete}
+    />
   );
 }

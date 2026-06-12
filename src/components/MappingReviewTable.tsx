@@ -13,6 +13,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import type {
   ColumnProfile,
   FieldMapping,
@@ -213,7 +214,7 @@ export function MappingReviewTable({
   };
 
   return (
-    <Card className="rounded-[2rem] p-6 gap-0">
+    <Card className="flex h-full min-h-0 flex-col gap-0 rounded-[2rem] p-6">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 p-0">
         <div>
           <Badge variant="outline" className="rounded-full">Mapping review</Badge>
@@ -230,7 +231,7 @@ export function MappingReviewTable({
         </div>
       </CardHeader>
 
-      <CardContent className="p-0 mt-5">
+      <CardContent className="mt-5 flex min-h-0 flex-1 flex-col p-0">
         <div className="flex flex-wrap gap-2">
           {filters.map((item) => (
             <Button
@@ -290,176 +291,180 @@ export function MappingReviewTable({
           </Button>
         </div>
 
-        <div className="mt-6 grid gap-4">
-          {filteredRows.map((row) => {
-            const confidenceTone = getConfidenceTone(row.confidence);
+        <div className="mt-6 min-h-0 flex-1 overflow-hidden">
+          <ScrollArea className="h-full">
+            <div className="grid gap-4 pr-2">
+              {filteredRows.map((row) => {
+                const confidenceTone = getConfidenceTone(row.confidence);
 
-            return (
-              <article
-                key={row.field.path}
-                className={clsx(
-                  "rounded-[1.6rem] border p-5 transition",
-                  row.status === "blocking" &&
-                    "border-[var(--danger)]/25 bg-[rgba(176,0,32,0.05)]",
-                  row.status === "review" &&
-                    "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.14)]",
-                  row.status === "confirmed" &&
-                    "border-[var(--success)]/20 bg-[rgba(45,106,79,0.06)]",
-                  row.status === "optional" && "border-border bg-card/80",
-                )}
-              >
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-lg font-semibold">{row.field.path}</h3>
-                      <Badge variant="outline" className="rounded-full">{row.field.type}</Badge>
-                      {row.field.required ? (
-                        <Badge variant="destructive" className="rounded-full">Required</Badge>
-                      ) : null}
-                    </div>
-                    <p className="mt-2 text-sm text-muted-foreground">{row.statusNote}</p>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <Badge
-                      variant={statusBadgeVariant(row.status)}
-                      className={clsx(
-                        "rounded-full",
-                        row.status !== "optional" && row.status !== "confirmed" && row.status !== "blocking" && row.status !== "review" && "border-border bg-white text-muted-foreground",
-                      )}
-                    >
-                      {row.statusLabel}
-                    </Badge>
-                    <Badge
-                      variant={confidenceTone.variant}
-                      className={clsx("rounded-full", confidenceTone.className)}
-                    >
-                      {confidenceTone.label}
-                    </Badge>
-                  </div>
-                </div>
-
-                <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_220px]">
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Suggested source
-                    </label>
-                    <Select
-                      value={row.mapping.sourceColumn ?? ""}
-                      onValueChange={(value) => {
-                        updateMapping(row.field.path, (current) => ({
-                          ...current,
-                          sourceColumn: value || null,
-                        }));
-                      }}
-                    >
-                      <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
-                        <SelectValue placeholder="Unmapped" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="">Unmapped</SelectItem>
-                        {columns.map((column) => (
-                          <SelectItem key={column.name} value={column.name}>
-                            {column.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {row.samples.length > 0 ? (
-                        row.samples.map((sample) => (
-                          <span
-                            key={`${row.field.path}-${sample}`}
-                            className="rounded-full bg-[rgba(20,33,61,0.06)] px-3 py-1 text-xs text-muted-foreground"
-                          >
-                            {sample}
-                          </span>
-                        ))
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Sample values will appear here once a source column is selected.
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Transform
-                      </label>
-                      <Select
-                        value={row.mapping.transform ?? "none"}
-                        onValueChange={(value) => {
-                          updateMapping(row.field.path, (current) => ({
-                            ...current,
-                            transform: value as TransformRule,
-                          }));
-                        }}
-                      >
-                        <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {transformOptions.map((option) => (
-                            <SelectItem key={option} value={option}>
-                              {option}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                        Expected type
-                      </label>
-                      <div className="mt-2 rounded-2xl border border-input bg-background px-4 py-3 text-sm text-muted-foreground">
-                        {row.field.type}
-                        {row.sourceProfile ? (
-                          <span className="block text-xs text-muted-foreground">
-                            Source looks like {row.sourceProfile.detectedType}
-                          </span>
-                        ) : null}
+                return (
+                  <article
+                    key={row.field.path}
+                    className={clsx(
+                      "rounded-[1.6rem] border p-5 transition",
+                      row.status === "blocking" &&
+                        "border-[var(--danger)]/25 bg-[rgba(176,0,32,0.05)]",
+                      row.status === "review" &&
+                        "border-[var(--warning)]/30 bg-[rgba(255,214,102,0.14)]",
+                      row.status === "confirmed" &&
+                        "border-[var(--success)]/20 bg-[rgba(45,106,79,0.06)]",
+                      row.status === "optional" && "border-border bg-card/80",
+                    )}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="text-lg font-semibold">{row.field.path}</h3>
+                          <Badge variant="outline" className="rounded-full">{row.field.type}</Badge>
+                          {row.field.required ? (
+                            <Badge variant="destructive" className="rounded-full">Required</Badge>
+                          ) : null}
+                        </div>
+                        <p className="mt-2 text-sm text-muted-foreground">{row.statusNote}</p>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge
+                          variant={statusBadgeVariant(row.status)}
+                          className={clsx(
+                            "rounded-full",
+                            row.status !== "optional" && row.status !== "confirmed" && row.status !== "blocking" && row.status !== "review" && "border-border bg-white text-muted-foreground",
+                          )}
+                        >
+                          {row.statusLabel}
+                        </Badge>
+                        <Badge
+                          variant={confidenceTone.variant}
+                          className={clsx("rounded-full", confidenceTone.className)}
+                        >
+                          {confidenceTone.label}
+                        </Badge>
                       </div>
                     </div>
-                  </div>
 
-                  <div>
-                    <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
-                      Constant value
-                    </label>
-                    <input
-                      value={row.mapping.constantValue ?? ""}
-                      onChange={(event) => {
-                        updateMapping(row.field.path, (current) => ({
-                          ...current,
-                          constantValue: event.target.value || null,
-                        }));
-                      }}
-                      className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                      placeholder="Optional default"
-                    />
-                  </div>
-                </div>
+                    <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)_220px]">
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Suggested source
+                        </label>
+                        <Select
+                          value={row.mapping.sourceColumn ?? ""}
+                          onValueChange={(value) => {
+                            updateMapping(row.field.path, (current) => ({
+                              ...current,
+                              sourceColumn: value || null,
+                            }));
+                          }}
+                        >
+                          <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
+                            <SelectValue placeholder="Unmapped" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Unmapped</SelectItem>
+                            {columns.map((column) => (
+                              <SelectItem key={column.name} value={column.name}>
+                                {column.name}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {row.samples.length > 0 ? (
+                            row.samples.map((sample) => (
+                              <span
+                                key={`${row.field.path}-${sample}`}
+                                className="rounded-full bg-[rgba(20,33,61,0.06)] px-3 py-1 text-xs text-muted-foreground"
+                              >
+                                {sample}
+                              </span>
+                            ))
+                          ) : (
+                            <p className="text-xs text-muted-foreground">
+                              Sample values will appear here once a source column is selected.
+                            </p>
+                          )}
+                        </div>
+                      </div>
 
-                <details className="mt-4 rounded-[1.2rem] border border-border bg-card/70 px-4 py-3">
-                  <summary className="cursor-pointer list-none text-sm font-semibold">
-                    Why this match? Manual notes
-                  </summary>
-                  <textarea
-                    value={row.mapping.reason ?? ""}
-                    onChange={(event) => {
-                      updateMapping(row.field.path, (current) => ({
-                        ...current,
-                        reason: event.target.value,
-                      }));
-                    }}
-                    className="mt-3 min-h-24 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                    placeholder="Add notes, rationale, or override comments."
-                  />
-                </details>
-              </article>
-            );
-          })}
+                      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
+                        <div>
+                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            Transform
+                          </label>
+                          <Select
+                            value={row.mapping.transform ?? "none"}
+                            onValueChange={(value) => {
+                              updateMapping(row.field.path, (current) => ({
+                                ...current,
+                                transform: value as TransformRule,
+                              }));
+                            }}
+                          >
+                            <SelectTrigger className="w-full mt-2 rounded-2xl px-4 py-3 h-auto">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {transformOptions.map((option) => (
+                                <SelectItem key={option} value={option}>
+                                  {option}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div>
+                          <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                            Expected type
+                          </label>
+                          <div className="mt-2 rounded-2xl border border-input bg-background px-4 py-3 text-sm text-muted-foreground">
+                            {row.field.type}
+                            {row.sourceProfile ? (
+                              <span className="block text-xs text-muted-foreground">
+                                Source looks like {row.sourceProfile.detectedType}
+                              </span>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="text-xs font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+                          Constant value
+                        </label>
+                        <input
+                          value={row.mapping.constantValue ?? ""}
+                          onChange={(event) => {
+                            updateMapping(row.field.path, (current) => ({
+                              ...current,
+                              constantValue: event.target.value || null,
+                            }));
+                          }}
+                          className="mt-2 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                          placeholder="Optional default"
+                        />
+                      </div>
+                    </div>
+
+                    <details className="mt-4 rounded-[1.2rem] border border-border bg-card/70 px-4 py-3">
+                      <summary className="cursor-pointer list-none text-sm font-semibold">
+                        Why this match? Manual notes
+                      </summary>
+                      <textarea
+                        value={row.mapping.reason ?? ""}
+                        onChange={(event) => {
+                          updateMapping(row.field.path, (current) => ({
+                            ...current,
+                            reason: event.target.value,
+                          }));
+                        }}
+                        className="mt-3 min-h-24 w-full rounded-2xl border border-input bg-background px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
+                        placeholder="Add notes, rationale, or override comments."
+                      />
+                    </details>
+                  </article>
+                );
+              })}
+            </div>
+          </ScrollArea>
         </div>
       </CardContent>
     </Card>

@@ -51,7 +51,7 @@ export async function POST(request: Request) {
   if (hasDetection) {
     const detection = preview.detection!;
 
-    if (detection.unmatchedRequiredFields.length > 0) {
+    if (detection.unmatchedRequiredFields.length > 0 && detection.headerRowIndex >= 0 && !detection.ambiguous) {
       const missing = detection.unmatchedRequiredFields.map(
         (f) => f.path,
       );
@@ -71,7 +71,7 @@ export async function POST(request: Request) {
       );
     }
 
-    if (detection.ambiguous) {
+    if (detection.ambiguous || detection.unmatchedRequiredFields.length > 0 || detection.headerRowIndex < 0) {
       const run = await prisma.mappingRun.create({
         data: {
           uploadedFileId: uploadedFile.id,
@@ -90,13 +90,16 @@ export async function POST(request: Request) {
           schemaTemplate,
           workbookMeta: uploadedFile.workbookMeta,
         },
-        warning:
-          "Header detection confidence is low. Please verify the detected header row.",
+        warning: detection.headerRowIndex < 0
+          ? "No header row detected. AI will analyze data columns directly."
+          : detection.ambiguous
+            ? "Header detection confidence is low. AI will analyze data columns directly."
+            : "Some required fields were not found in headers. AI will attempt to match from data.",
         detection: {
           headerRowIndex: detection.headerRowIndex,
           matchedFields: detection.matchedFields,
           confidence: detection.confidence,
-          ambiguous: true,
+          ambiguous: detection.ambiguous,
         },
       });
     }

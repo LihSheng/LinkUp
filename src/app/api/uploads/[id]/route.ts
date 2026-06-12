@@ -5,8 +5,10 @@ import { prisma } from "@/lib/prisma";
 
 type Params = Promise<{ id: string }>;
 
-export async function GET(_request: Request, context: { params: Params }) {
+export async function GET(request: Request, context: { params: Params }) {
   const { id } = await context.params;
+  const url = new URL(request.url);
+  const preferredSheet = url.searchParams.get("sheet") || undefined;
 
   const uploadedFile = await prisma.uploadedFile.findUnique({
     where: { id },
@@ -23,7 +25,10 @@ export async function GET(_request: Request, context: { params: Params }) {
 
   let preview = null;
   try {
-    preview = await previewWorkbook({ filePath: uploadedFile.storagePath });
+    preview = await previewWorkbook({
+      filePath: uploadedFile.storagePath,
+      preferredSheetName: preferredSheet,
+    });
   } catch {
     // Non-blocking. A saved upload should still be restorable even if preview fails.
   }

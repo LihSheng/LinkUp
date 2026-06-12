@@ -8,8 +8,8 @@ import clsx from "clsx";
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 import { WizardFooter } from "@/components/wizard/WizardFooter";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/components/ui/sonner";
 import {
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -56,6 +56,8 @@ export default function WorkbookStepPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("uploadId");
+  const initialSheet = searchParams.get("sheet");
+  const templateId = searchParams.get("templateId");
   const { completeStep, isStepAccessible } = useWizardProgress();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -69,6 +71,7 @@ export default function WorkbookStepPage() {
   const [isDragging, setIsDragging] = useState(false);
   const [activePanelTab, setActivePanelTab] = useState<UploadPanelTab>("general");
   const [visibleSampleRowCount, setVisibleSampleRowCount] = useState(5);
+  const [selectedSheetName, setSelectedSheetName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!isStepAccessible(1)) {
@@ -87,7 +90,10 @@ export default function WorkbookStepPage() {
       setIsRestoring(true);
 
       try {
-        const response = await fetch(`/api/uploads/${uploadId}`);
+        const restoreUrl = initialSheet
+          ? `/api/uploads/${uploadId}?sheet=${encodeURIComponent(initialSheet)}`
+          : `/api/uploads/${uploadId}`;
+        const response = await fetch(restoreUrl);
         const data = await response.json();
 
         if (!response.ok) {
@@ -100,6 +106,7 @@ export default function WorkbookStepPage() {
 
         setUploadedFile(data.uploadedFile);
         setPreview(data.preview);
+        setSelectedSheetName(data.preview?.sourceSheetName ?? null);
         setFileSize(
           typeof data.uploadedFile?.workbookMeta?.fileSize === "number"
             ? data.uploadedFile.workbookMeta.fileSize
@@ -133,7 +140,7 @@ export default function WorkbookStepPage() {
     return () => {
       cancelled = true;
     };
-  }, [pageState, restoredUploadId, uploadId, uploadedFile]);
+  }, [pageState, restoredUploadId, uploadId, uploadedFile, initialSheet]);
 
   const uploadFile = useCallback(
     async (file: File) => {
@@ -170,6 +177,7 @@ export default function WorkbookStepPage() {
 
         setUploadedFile(data.uploadedFile);
         setPreview(data.preview);
+        setSelectedSheetName(data.preview?.sourceSheetName ?? null);
         setFileSize(
           typeof data.uploadedFile?.workbookMeta?.fileSize === "number"
             ? data.uploadedFile.workbookMeta.fileSize
@@ -178,18 +186,21 @@ export default function WorkbookStepPage() {
         setPageState("success");
         setActivePanelTab("general");
         setVisibleSampleRowCount(5);
-        router.replace(`/wizard/workbook?uploadId=${data.uploadedFile.id}`);
+        const replaceParams = new URLSearchParams({ uploadId: data.uploadedFile.id });
+        if (templateId) replaceParams.set("templateId", templateId);
+        router.replace(`/wizard/workbook?${replaceParams.toString()}`);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Upload failed.");
         setPageState("error");
       }
     },
-    [router],
+    [router, templateId],
   );
 
   const handleRemove = useCallback(() => {
     setUploadedFile(null);
     setPreview(null);
+    setSelectedSheetName(null);
     setFileSize(0);
     setPageState("idle");
     setError(null);
@@ -236,6 +247,33 @@ export default function WorkbookStepPage() {
     [uploadFile],
   );
 
+  const handleSelectSheet = useCallback(
+    async (sheetName: string) => {
+      if (!uploadedFile || sheetName === selectedSheetName) return;
+
+      try {
+        const response = await fetch(
+          `/api/uploads/${uploadedFile.id}?sheet=${encodeURIComponent(sheetName)}`,
+        );
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.error ?? "Failed to load sheet preview.");
+        }
+
+        setPreview(data.preview);
+        setSelectedSheetName(sheetName);
+        setVisibleSampleRowCount(5);
+        setActivePanelTab("data-preview");
+      } catch (err) {
+        toast.error("Failed to load sheet", {
+          description: err instanceof Error ? err.message : "Unable to load sheet preview.",
+        });
+      }
+    },
+    [uploadedFile, selectedSheetName],
+  );
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
@@ -249,9 +287,17 @@ export default function WorkbookStepPage() {
       return;
     }
 
+    const params = new URLSearchParams({ uploadId: uploadedFile.id });
+    if (selectedSheetName) {
+      params.set("sheet", selectedSheetName);
+    }
+    if (templateId) {
+      params.set("templateId", templateId);
+    }
+
     completeStep(1);
-    router.push(`/wizard/mapping?uploadId=${uploadedFile.id}`);
-  }, [completeStep, router, uploadedFile]);
+    router.push(`/wizard/mapping?${params.toString()}`);
+  }, [completeStep, router, uploadedFile, selectedSheetName, templateId]);
 
   const visibleSampleRows = preview?.sampleRows.slice(0, visibleSampleRowCount) ?? [];
   const columnProfiles = preview?.columnProfiles ?? [];
@@ -262,7 +308,7 @@ export default function WorkbookStepPage() {
     <div className="wizard-step-page">
       <section className="wizard-panel" style={{ flex: "1 1 auto" }}>
         {pageState === "success" && uploadedFile ? (
-          <div className="w-full max-w-full min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.7)] p-[18px_20px]">
+          <div className="flex min-h-0 w-full flex-1 flex-col max-w-full min-w-0 overflow-hidden rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.7)] p-[18px_20px]">
             <div className="mb-2 inline-flex w-fit rounded-full bg-[rgba(28,28,28,0.05)] p-1">
               <Button
                 type="button"
@@ -339,18 +385,25 @@ export default function WorkbookStepPage() {
                       </p>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {preview.sheetNames.map((name) => (
-                          <span
+                          <button
                             key={name}
-                            className="sheet-pill"
+                            type="button"
+                            className={clsx(
+                              "sheet-pill",
+                              name === selectedSheetName && "sheet-pill-active",
+                            )}
+                            onClick={() => handleSelectSheet(name)}
                             style={{
                               padding: "4px 14px",
                               borderRadius: "var(--radius-full)",
                               fontSize: "0.85rem",
                               lineHeight: "1.6",
+                              cursor: name === selectedSheetName ? "default" : "pointer",
                             }}
                           >
                             {name}
-                          </span>
+                            {name === selectedSheetName ? " \u2713" : ""}
+                          </button>
                         ))}
                       </div>
                     </div>
@@ -379,7 +432,7 @@ export default function WorkbookStepPage() {
                 ) : null}
               </div>
             ) : activePanelTab === "data-preview" ? (
-              <div className="flex min-h-[420px] min-w-0 flex-col gap-3">
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">
                     Header row detected at row {preview ? preview.headerRowIndex + 1 : "-"}.
@@ -401,7 +454,7 @@ export default function WorkbookStepPage() {
                 </div>
                 {visibleSampleRows.length > 0 ? (
                   <div
-                    className="max-w-full min-w-0 flex-1 overflow-x-auto overflow-y-auto"
+                    className="relative max-w-full min-w-0 flex-1 overflow-auto"
                     style={{
                       minHeight: "320px",
                       border: "1px solid var(--color-border)",
@@ -409,7 +462,7 @@ export default function WorkbookStepPage() {
                       background: "rgba(252,251,248,0.55)",
                     }}
                   >
-                    <Table className="min-w-max text-[0.82rem]">
+                    <table className="w-full min-w-max text-[0.82rem]">
                       <TableHeader className="sticky top-0 z-10 bg-[rgba(252,251,248,0.96)]">
                         <TableRow>
                           {previewHeaders.map((header) => (
@@ -436,7 +489,7 @@ export default function WorkbookStepPage() {
                           </TableRow>
                         ))}
                       </TableBody>
-                    </Table>
+                    </table>
                   </div>
                 ) : null}
               </div>
@@ -447,30 +500,23 @@ export default function WorkbookStepPage() {
                 </div>
                 {columnProfiles.length > 0 ? (
                   <div
-                    style={{
-                      display: "grid",
-                      gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-                      gap: "10px",
-                    }}
+                    className="min-w-0 overflow-hidden rounded-sm border border-[var(--color-border)]"
                   >
-                    {columnProfiles.map((col) => (
+                    {columnProfiles.map((col, idx) => (
                       <div
                         key={col.name}
+                        className="flex items-center justify-between gap-3 px-4 py-2.5"
                         style={{
-                          border: "1px solid var(--color-border)",
-                          borderRadius: "var(--radius-sm)",
-                          padding: "12px 14px",
-                          background: "rgba(252,251,248,0.7)",
-                          minWidth: 0,
+                          borderTop: idx > 0 ? "1px solid var(--color-border)" : "none",
                         }}
                       >
                         <strong
                           className="block truncate"
-                          style={{ fontSize: "0.82rem", marginBottom: "4px" }}
+                          style={{ fontSize: "0.82rem" }}
                         >
                           {col.name}
                         </strong>
-                        <span style={{ fontSize: "0.78rem", color: "var(--color-muted)" }}>
+                        <span style={{ fontSize: "0.78rem", color: "var(--color-muted)", whiteSpace: "nowrap" }}>
                           {col.detectedType}
                         </span>
                       </div>

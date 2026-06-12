@@ -75,9 +75,17 @@ export async function deleteSchemaTemplate(templateId: string) {
     throw new Error("Template not found.");
   }
 
-  if (template._count.runs > 0 || template._count.templates > 0) {
+  const parts: string[] = [];
+  if (template._count.runs > 0) {
+    parts.push(`${template._count.runs} saved run(s)`);
+  }
+  if (template._count.templates > 0) {
+    parts.push(`${template._count.templates} mapping(s)`);
+  }
+
+  if (parts.length > 0) {
     throw new Error(
-      "This template is still used by saved runs or mappings and cannot be deleted.",
+      `This template is still used by ${parts.join(" and ")} and cannot be deleted.`,
     );
   }
 

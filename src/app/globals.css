@@ -1315,12 +1315,20 @@ summary::-webkit-details-marker {
   min-width: 0;
   display: grid;
   grid-template-rows: auto 1fr;
-  min-height: 100vh;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
 }
 
 .dashboard-content,
 .wizard-content {
   min-width: 0;
+  min-height: 0;
+}
+
+.wizard-content {
+  display: flex;
+  overflow: hidden;
 }
 
 /* ══════════════════════════════════════════════
@@ -1941,7 +1949,7 @@ summary::-webkit-details-marker {
   min-width: 0;
   min-height: 0;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
 }
@@ -2075,6 +2083,27 @@ summary::-webkit-details-marker {
 .wizard-placeholder p {
   margin: 0;
   color: var(--color-muted);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--color-ink-40) 0%,
+    rgba(28, 28, 28, 0.2) 40%,
+    var(--color-ink-40) 80%,
+    var(--color-ink-40) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .wizard-footer {
