@@ -6,7 +6,6 @@ import Link from "next/link";
 import useSWR from "swr";
 import { LayoutGrid, RefreshCcw, Search, Star } from "lucide-react";
 
-import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { DataTable } from "@/components/DataTable";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -79,7 +78,6 @@ function describeSourceSignature(sourceSignature?: string | null) {
       return `${Object.keys(parsed).length} signature field${Object.keys(parsed).length === 1 ? "" : "s"}`;
     }
   } catch {
-    // fall back to generic copy below
   }
 
   return "Source signature saved";
@@ -280,140 +278,138 @@ export default function MappingTemplatesPage() {
   );
 
   return (
-    <DashboardShell>
-      <div className="dashboard-page">
-        <section className="dashboard-hero">
-          <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-            Reusable mappings
-          </p>
-          <h1>Mapping Templates</h1>
-          <p className="dashboard-lede">
-            Browse every finalized mapping result, flag the ones worth reusing, and jump back to the source schema.
-          </p>
-        </section>
+    <div className="dashboard-page">
+      <section className="dashboard-hero">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
+          Reusable mappings
+        </p>
+        <h1>Mapping Templates</h1>
+        <p className="dashboard-lede">
+          Browse every finalized mapping result, flag the ones worth reusing, and jump back to the source schema.
+        </p>
+      </section>
 
-        <section className="grid gap-4 xl:grid-cols-4">
-          <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Total templates
-            </div>
-            <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
-              {templates.length}
-            </div>
-          </article>
-          <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Favorites
-            </div>
-            <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
-              {favoriteCount}
-            </div>
-          </article>
-          <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Schemas covered
-            </div>
-            <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
-              {schemaCount}
-            </div>
-          </article>
-          <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
-            <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Latest update
-            </div>
-            <div className="mt-3 text-sm font-medium text-[var(--color-ink)]">
-              {latestUpdated ? formatDate(latestUpdated) : "No templates yet"}
-            </div>
-          </article>
-        </section>
+      <section className="grid gap-4 xl:grid-cols-4">
+        <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+            Total templates
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
+            {templates.length}
+          </div>
+        </article>
+        <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+            Favorites
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
+            {favoriteCount}
+          </div>
+        </article>
+        <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+            Schemas covered
+          </div>
+          <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
+            {schemaCount}
+          </div>
+        </article>
+        <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
+            Latest update
+          </div>
+          <div className="mt-3 text-sm font-medium text-[var(--color-ink)]">
+            {latestUpdated ? formatDate(latestUpdated) : "No templates yet"}
+          </div>
+        </article>
+      </section>
 
-        <section className="mt-2 grid gap-4 rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
-            <Input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search templates, schemas, or signatures"
-              className="h-10 pl-9"
-            />
-          </label>
+      <section className="mt-2 grid gap-4 rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-4 md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--color-muted)]" />
+          <Input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search templates, schemas, or signatures"
+            className="h-10 pl-9"
+          />
+        </label>
 
-          <Button
-            type="button"
-            variant={favoritesOnly ? "default" : "outline"}
-            size="sm"
-            onClick={() => setFavoritesOnly((current) => !current)}
-          >
-            <Star className="h-3.5 w-3.5" />
-            Favorites only
-          </Button>
+        <Button
+          type="button"
+          variant={favoritesOnly ? "default" : "outline"}
+          size="sm"
+          onClick={() => setFavoritesOnly((current) => !current)}
+        >
+          <Star className="h-3.5 w-3.5" />
+          Favorites only
+        </Button>
 
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() => void mutate()}
-            disabled={isLoading}
-          >
-            <RefreshCcw className="h-3.5 w-3.5" />
-            Refresh
-          </Button>
-        </section>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => void mutate()}
+          disabled={isLoading}
+        >
+          <RefreshCcw className="h-3.5 w-3.5" />
+          Refresh
+        </Button>
+      </section>
 
-        <section className="dashboard-section">
-          <div className="dashboard-section-head">
-            <div>
-              <h2>All mapping templates</h2>
-              <p>{filteredTemplates.length} template{filteredTemplates.length === 1 ? "" : "s"} shown.</p>
+      <section className="dashboard-section">
+        <div className="dashboard-section-head">
+          <div>
+            <h2>All mapping templates</h2>
+            <p>{filteredTemplates.length} template{filteredTemplates.length === 1 ? "" : "s"} shown.</p>
+          </div>
+        </div>
+
+        {isLoading ? (
+          <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-8">
+            <div className="space-y-3">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <Skeleton key={index} className="h-10 w-full" />
+              ))}
             </div>
           </div>
-
-          {isLoading ? (
-            <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-8">
-              <div className="space-y-3">
-                {Array.from({ length: 5 }).map((_, index) => (
-                  <Skeleton key={index} className="h-10 w-full" />
-                ))}
-              </div>
+        ) : error ? (
+          <div className="rounded-2xl border border-[rgba(180,60,48,0.18)] bg-[rgba(180,60,48,0.05)] p-5 text-sm text-[var(--color-ink)]">
+            Failed to load mapping templates.
+          </div>
+        ) : filteredTemplates.length === 0 && templates.length > 0 ? (
+          <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
+              <LayoutGrid className="h-5 w-5" />
             </div>
-          ) : error ? (
-            <div className="rounded-2xl border border-[rgba(180,60,48,0.18)] bg-[rgba(180,60,48,0.05)] p-5 text-sm text-[var(--color-ink)]">
-              Failed to load mapping templates.
+            <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
+              No mapping templates match
+            </h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
+              Clear the filter or finish a mapping run to create the first reusable template.
+            </p>
+          </div>
+        ) : filteredTemplates.length === 0 ? (
+          <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
+              <LayoutGrid className="h-5 w-5" />
             </div>
-          ) : filteredTemplates.length === 0 && templates.length > 0 ? (
-            <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
-                <LayoutGrid className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
-                No mapping templates match
-              </h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
-                Clear the filter or finish a mapping run to create the first reusable template.
-              </p>
-            </div>
-          ) : filteredTemplates.length === 0 ? (
-            <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
-              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
-                <LayoutGrid className="h-5 w-5" />
-              </div>
-              <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
-                No templates yet
-              </h3>
-              <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
-                Finish a mapping run to create your first reusable template.
-              </p>
-            </div>
-          ) : (
-            <DataTable
-              columns={columns}
-              data={filteredTemplates}
-              globalFilter={query}
-            />
-          )}
-        </section>
-      </div>
-    </DashboardShell>
+            <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
+              No templates yet
+            </h3>
+            <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
+              Finish a mapping run to create your first reusable template.
+            </p>
+          </div>
+        ) : (
+          <DataTable
+            columns={columns}
+            data={filteredTemplates}
+            globalFilter={query}
+          />
+        )}
+      </section>
+    </div>
   );
 }

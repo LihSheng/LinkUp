@@ -1256,6 +1256,16 @@ summary::-webkit-details-marker {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  align-items: center;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.dashboard-sidebar-bottom p {
+  margin: 0;
+  white-space: nowrap;
 }
 
 .dashboard-quick-upload {

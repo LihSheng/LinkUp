@@ -81,7 +81,9 @@ export function DashboardShell({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-
+        <div className="dashboard-sidebar-bottom" aria-label="Dashboard copyright">
+          <p>&#xA9; {new Date().getFullYear()} LinkUp.</p>
+        </div>
       </aside>
 
       <div className="dashboard-main-shell">
