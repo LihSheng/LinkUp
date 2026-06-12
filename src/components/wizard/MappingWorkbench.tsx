@@ -81,7 +81,11 @@ type OutputResponse = {
 
 type MappingWorkbenchProps = {
   onBack?: () => void;
-  onComplete?: () => void;
+  onComplete?: (runId?: string) => void;
+  initialRunId?: string;
+  initialTargetFields?: TargetField[];
+  initialColumnProfiles?: ColumnProfile[];
+  initialMappings?: FieldMapping[];
 };
 
 function formatTime(d: Date): string {
@@ -110,20 +114,29 @@ function jsonPreviewFromMappings(mappings: FieldMapping[]): string {
   return JSON.stringify(obj, null, 2);
 }
 
-export function MappingWorkbench({ onBack, onComplete }: MappingWorkbenchProps) {
+export function MappingWorkbench({
+  onBack,
+  onComplete,
+  initialRunId,
+  initialTargetFields,
+  initialColumnProfiles,
+  initialMappings,
+}: MappingWorkbenchProps) {
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("uploadId");
   const sheet = searchParams.get("sheet");
   const templateId = searchParams.get("templateId");
 
-  const [phase, setPhase] = useState<WorkbenchPhase>("init");
+  const [phase, setPhase] = useState<WorkbenchPhase>(
+    initialTargetFields && initialMappings ? "review" : "init",
+  );
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [missingFieldsInfo, setMissingFieldsInfo] = useState<MissingFieldsInfo | null>(null);
   const [warningMessage, setWarningMessage] = useState<string | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [targetFields, setTargetFields] = useState<TargetField[]>([]);
-  const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>([]);
-  const [mappings, setMappings] = useState<FieldMapping[]>([]);
+  const [runId, setRunId] = useState<string | null>(initialRunId ?? null);
+  const [targetFields, setTargetFields] = useState<TargetField[]>(initialTargetFields ?? []);
+  const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>(initialColumnProfiles ?? []);
+  const [mappings, setMappings] = useState<FieldMapping[]>(initialMappings ?? []);
   const [entries, setEntries] = useState<LogEntry[]>([
     { id: 0, message: "Initializing mapping engine...", level: "info" },
   ]);
@@ -288,7 +301,7 @@ export function MappingWorkbench({ onBack, onComplete }: MappingWorkbenchProps) 
 
       addLog("Output generated successfully", "success");
       toast.success("Output ready", { description: "Your mapped data is ready to export." });
-      onComplete?.();
+      onComplete?.(runId);
     } catch (err) {
       setPhase("review");
       const msg = err instanceof Error ? err.message : "Confirmation failed.";

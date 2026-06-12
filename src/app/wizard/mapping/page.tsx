@@ -2,9 +2,13 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
 
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
 import { MappingWorkbench } from "@/components/wizard/MappingWorkbench";
+import type { ColumnProfile, FieldMapping, TargetField } from "@/lib/mapping/mapping.types";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function MappingStepPage() {
   const router = useRouter();
@@ -12,7 +16,13 @@ export default function MappingStepPage() {
   const uploadId = searchParams.get("uploadId");
   const sheet = searchParams.get("sheet");
   const templateId = searchParams.get("templateId");
+  const runId = searchParams.get("runId");
   const { completeStep, isStepAccessible } = useWizardProgress();
+
+  const { data: existingRun } = useSWR(
+    runId ? `/api/mapping-runs/${runId}` : null,
+    fetcher,
+  );
 
   useEffect(() => {
     if (!isStepAccessible(2)) {
@@ -28,15 +38,27 @@ export default function MappingStepPage() {
     router.push(`/wizard/workbook?${params.toString()}`);
   }, [router, uploadId, sheet, templateId]);
 
-  const handleComplete = useCallback(() => {
+  const handleComplete = useCallback((runId?: string) => {
     completeStep(2);
-    router.push("/wizard/output");
-  }, [completeStep, router]);
+    const params = new URLSearchParams(searchParams.toString());
+    if (runId && !params.has("runId")) params.set("runId", runId);
+    const qs = params.toString();
+    router.push(`/wizard/output${qs ? `?${qs}` : ""}`);
+  }, [completeStep, router, searchParams]);
+
+  const confirmedMapping = existingRun?.run?.confirmedMapping as { mappings?: FieldMapping[] } | null;
+  const initialMappings = confirmedMapping?.mappings;
+  const initialTargetFields = existingRun?.run?.targetFields as TargetField[] | undefined;
+  const initialColumnProfiles = existingRun?.run?.columnProfiles as ColumnProfile[] | undefined;
 
   return (
     <MappingWorkbench
       onBack={handleBack}
       onComplete={handleComplete}
+      initialRunId={runId ?? undefined}
+      initialTargetFields={initialTargetFields}
+      initialColumnProfiles={initialColumnProfiles}
+      initialMappings={initialMappings}
     />
   );
 }

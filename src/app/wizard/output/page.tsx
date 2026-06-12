@@ -1,14 +1,24 @@
 "use client";
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useCallback, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import useSWR from "swr";
 
-import { WizardStepPage } from "@/components/wizard/WizardStepPage";
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
+import { MappingCompleteScreen } from "@/components/wizard/MappingCompleteScreen";
+
+const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function OutputStepPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const runId = searchParams.get("runId");
   const { completeStep, isStepAccessible } = useWizardProgress();
+
+  const { data, error, isLoading } = useSWR(
+    runId ? `/api/mapping-runs/${runId}` : null,
+    fetcher,
+  );
 
   useEffect(() => {
     if (!isStepAccessible(3)) {
@@ -16,29 +26,48 @@ export default function OutputStepPage() {
     }
   }, [isStepAccessible, router]);
 
-  return (
-    <WizardStepPage
-      step="Step 4"
-      title="Review & export"
-      description="This route is reserved for the record preview and final confirmation state. The skeleton keeps the route tree in place before the real UI lands."
-      note="The output page should surface validation, transformed records, and a final confirmation action after mapping is locked."
-      statusText="Review results and export your data"
-      stats={[
-        { label: "Records", value: "0" },
-        { label: "Warnings", value: "0" },
-        { label: "Errors", value: "0" },
-      ]}
-      primaryLabel="Done"
-      onContinue={() => {
-        completeStep(3);
-        router.push("/");
-      }}
-      onBack={() => router.push("/wizard/mapping")}
-    >
-      <div className="wizard-placeholder">
-        <strong>Output preview placeholder</strong>
-        <p>Final record review and import confirmation can slot in here later.</p>
+  useEffect(() => {
+    if (isStepAccessible(3) && !runId) {
+      router.replace("/wizard/mapping");
+    }
+  }, [isStepAccessible, runId, router]);
+
+  const handleBack = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    router.push(`/wizard/mapping${params.toString() ? `?${params.toString()}` : ""}`);
+  }, [router, searchParams]);
+
+  const handleFinish = useCallback(() => {
+    completeStep(3);
+    router.push("/");
+  }, [completeStep, router]);
+
+  if (isLoading) {
+    return (
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <p className="text-sm text-[var(--color-muted)]">Loading completion data...</p>
       </div>
-    </WizardStepPage>
+    );
+  }
+
+  if (error || !data?.run) {
+    return (
+      <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col items-center justify-center gap-4 px-1">
+        <p className="text-sm text-[var(--color-error)]">
+          {error ? "Failed to load completion data." : "No mapping data found."}
+        </p>
+        <button type="button" className="ghost-button" onClick={handleBack}>
+          Back to mapping
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <MappingCompleteScreen
+      runData={data.run}
+      onBack={handleBack}
+      onFinish={handleFinish}
+    />
   );
 }
