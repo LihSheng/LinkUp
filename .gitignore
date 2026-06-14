@@ -31,6 +31,9 @@ yarn-error.log*
 .pnpm-debug.log*
 .next-dev.log
 .next-dev.err.log
+.next-dev.out.log
+dev.err.log
+dev.out.log
 linkup-dev.err.log
 linkup-dev.out.log
 

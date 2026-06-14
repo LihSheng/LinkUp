@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 
+import { AppError } from "@/lib/app-error";
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 
@@ -72,7 +73,12 @@ export async function deleteSchemaTemplate(templateId: string) {
   });
 
   if (!template) {
-    throw new Error("Template not found.");
+    throw new AppError("Template not found.", {
+      category: "not-found",
+      status: 404,
+      scope: "partial",
+      retryable: false,
+    });
   }
 
   const parts: string[] = [];
@@ -84,9 +90,12 @@ export async function deleteSchemaTemplate(templateId: string) {
   }
 
   if (parts.length > 0) {
-    throw new Error(
-      `This template is still used by ${parts.join(" and ")} and cannot be deleted.`,
-    );
+    throw new AppError(`This template is still used by ${parts.join(" and ")} and cannot be deleted.`, {
+      category: "conflict",
+      status: 409,
+      scope: "partial",
+      retryable: false,
+    });
   }
 
   await prisma.schemaTemplate.delete({

@@ -2,30 +2,33 @@ import { NextResponse } from "next/server";
 
 import { updateMappingTemplateSchema } from "@/lib/contracts";
 import { prisma } from "@/lib/prisma";
+import { defineApiRouteHandlers } from "@/lib/api-error-handler";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
 };
 
-export async function PATCH(request: Request, context: RouteContext) {
-  const { id } = await Promise.resolve(context.params);
-  const payload = updateMappingTemplateSchema.parse(await request.json());
+export const { PATCH } = defineApiRouteHandlers({
+  PATCH: async (request: Request, context: RouteContext) => {
+    const { id } = await Promise.resolve(context.params);
+    const payload = updateMappingTemplateSchema.parse(await request.json());
 
-  const existing = await prisma.mappingTemplate.findUnique({
-    where: { id },
-  });
+    const existing = await prisma.mappingTemplate.findUnique({
+      where: { id },
+    });
 
-  if (!existing) {
-    return NextResponse.json(
-      { error: "Mapping template not found." },
-      { status: 404 },
-    );
-  }
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Mapping template not found." },
+        { status: 404 },
+      );
+    }
 
-  const updated = await prisma.mappingTemplate.update({
-    where: { id },
-    data: payload,
-  });
+    const updated = await prisma.mappingTemplate.update({
+      where: { id },
+      data: payload,
+    });
 
-  return NextResponse.json({ template: updated });
-}
+    return NextResponse.json({ template: updated });
+  },
+});

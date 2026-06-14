@@ -2,38 +2,41 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
+import { defineApiRouteHandlers } from "@/lib/api-error-handler";
 
-export async function GET(request: NextRequest) {
-  const token = request.nextUrl.searchParams.get("token");
+export const { GET } = defineApiRouteHandlers({
+  GET: async (request: NextRequest) => {
+    const token = request.nextUrl.searchParams.get("token");
 
-  if (!token) {
-    return NextResponse.json(
-      { error: "Draft token is required." },
-      { status: 400 },
-    );
-  }
+    if (!token) {
+      return NextResponse.json(
+        { error: "Draft token is required." },
+        { status: 400 },
+      );
+    }
 
-  const run = await prisma.mappingRun.findUnique({
-    where: { draftToken: token },
-    include: {
-      uploadedFile: true,
-      schemaTemplate: true,
-      output: true,
-    },
-  });
+    const run = await prisma.mappingRun.findUnique({
+      where: { draftToken: token },
+      include: {
+        uploadedFile: true,
+        schemaTemplate: true,
+        output: true,
+      },
+    });
 
-  if (!run) {
-    return NextResponse.json(
-      { error: "Draft not found." },
-      { status: 404 },
-    );
-  }
+    if (!run) {
+      return NextResponse.json(
+        { error: "Draft not found." },
+        { status: 404 },
+      );
+    }
 
-  return NextResponse.json({
-    run: {
-      ...run,
-      targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
-      workbookMeta: run.uploadedFile?.workbookMeta ?? null,
-    },
-  });
-}
+    return NextResponse.json({
+      run: {
+        ...run,
+        targetFields: flattenJsonSchema(run.schemaTemplate.jsonSchema),
+        workbookMeta: run.uploadedFile?.workbookMeta ?? null,
+      },
+    });
+  },
+});
