@@ -3,6 +3,7 @@
 import { type ColumnDef } from "@tanstack/react-table";
 import { useCallback, useMemo, useState } from "react";
 import Link from "next/link";
+import { useTranslation } from "react-i18next";
 import useSWR from "swr";
 import { LayoutGrid, RefreshCcw, Search, Star } from "lucide-react";
 
@@ -91,6 +92,7 @@ function formatDate(value: string) {
 }
 
 export default function MappingTemplatesPage() {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [favoriteLoadingId, setFavoriteLoadingId] = useState<string | null>(null);
@@ -164,14 +166,14 @@ export default function MappingTemplatesPage() {
         await mutate();
 
         toast.success(
-          template.isFavorite ? "Removed from favorites" : "Marked as favorite",
+          template.isFavorite ? t("mappingTemplates.favRemoved") : t("mappingTemplates.favMarked"),
           {
-            description: `"${template.name}" was updated.`,
+            description: t(template.isFavorite ? "mappingTemplates.favRemovedDesc" : "mappingTemplates.favMarkedDesc", { name: template.name }),
           },
         );
       } catch (err) {
-        toast.error("Unable to update template", {
-          description: err instanceof Error ? err.message : "Try again.",
+        toast.error(t("mappingTemplates.favError"), {
+          description: err instanceof Error ? err.message : t("mappingTemplates.favErrorDesc"),
         });
       } finally {
         setFavoriteLoadingId(null);
@@ -185,16 +187,16 @@ export default function MappingTemplatesPage() {
       {
         id: "name",
         accessorFn: (row) => row.name,
-        header: "Name",
+        header: t("mappingTemplates.table.name"),
         enableSorting: true,
         cell: ({ row }) => (
           <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
-              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/80 text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
+              className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-[var(--surface-panel)] text-[var(--color-muted)] transition-colors hover:text-[var(--color-ink)]"
               onClick={() => void handleToggleFavorite(row.original)}
               disabled={favoriteLoadingId === row.original.id}
-              aria-label={row.original.isFavorite ? "Remove from favorites" : "Mark as favorite"}
+              aria-label={row.original.isFavorite ? t("mappingTemplates.favLabelRemove") : t("mappingTemplates.favLabelMark")}
               aria-pressed={row.original.isFavorite}
             >
               <Star
@@ -209,7 +211,7 @@ export default function MappingTemplatesPage() {
       {
         id: "schema",
         accessorFn: (row) => row.schemaTemplate.name,
-        header: "Schema",
+        header: t("mappingTemplates.table.schema"),
         enableSorting: true,
         cell: ({ row }) => (
           <span>{row.original.schemaTemplate.name}</span>
@@ -218,7 +220,7 @@ export default function MappingTemplatesPage() {
       {
         id: "sourceSignature",
         accessorFn: (row) => describeSourceSignature(row.sourceSignature),
-        header: "Source Signature",
+        header: t("mappingTemplates.table.sourceSignature"),
         enableSorting: true,
         cell: ({ row }) => (
           <span className="text-[var(--color-muted)]">
@@ -229,7 +231,7 @@ export default function MappingTemplatesPage() {
       {
         id: "mappings",
         accessorFn: (row) => countMappings(row.confirmedMapping),
-        header: "Mappings",
+        header: t("mappingTemplates.table.mappings"),
         enableSorting: true,
         cell: ({ row }) => (
           <span className="tabular-nums">
@@ -240,7 +242,7 @@ export default function MappingTemplatesPage() {
       {
         id: "updatedAt",
         accessorFn: (row) => row.updatedAt,
-        header: "Updated",
+        header: t("mappingTemplates.table.updated"),
         enableSorting: true,
         sortingFn: "datetime",
         cell: ({ row }) => (
@@ -259,40 +261,40 @@ export default function MappingTemplatesPage() {
               className={`rounded-full border px-2.5 py-0.5 text-[0.7rem] font-semibold uppercase tracking-[0.12em] whitespace-nowrap ${
                 row.original.isFavorite
                   ? "border-[rgba(118,96,35,0.18)] bg-[rgba(255,214,102,0.12)] text-[rgba(118,96,35,1)]"
-                  : "border-[var(--dashboard-panel-border)] bg-[rgba(255,255,255,0.7)] text-[var(--color-muted)]"
+                  : "border-[var(--dashboard-panel-border)] bg-[var(--surface-panel-soft)] text-[var(--color-muted)]"
               }`}
             >
-              {row.original.isFavorite ? "Favorite" : "Saved"}
+              {row.original.isFavorite ? t("mappingTemplates.badgeFavorite") : t("mappingTemplates.badgeSaved")}
             </span>
             <Link
               href={`/wizard/schema?templateId=${row.original.schemaTemplate.id}`}
               className={buttonVariants({ variant: "outline", size: "sm" })}
             >
-              Open schema
+              {t("mappingTemplates.table.openSchema")}
             </Link>
           </div>
         ),
       },
     ],
-    [favoriteLoadingId, handleToggleFavorite],
+    [favoriteLoadingId, handleToggleFavorite, t],
   );
 
   return (
     <div className="dashboard-page">
       <section className="dashboard-hero">
         <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-          Reusable mappings
+          {t("mappingTemplates.pageTitle")}
         </p>
-        <h1>Mapping Templates</h1>
+        <h1>{t("mappingTemplates.heading")}</h1>
         <p className="dashboard-lede">
-          Browse every finalized mapping result, flag the ones worth reusing, and jump back to the source schema.
+          {t("mappingTemplates.lede")}
         </p>
       </section>
 
       <section className="grid gap-4 xl:grid-cols-4">
         <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-            Total templates
+            {t("mappingTemplates.totalTemplates")}
           </div>
           <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
             {templates.length}
@@ -300,7 +302,7 @@ export default function MappingTemplatesPage() {
         </article>
         <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-            Favorites
+            {t("mappingTemplates.favorites")}
           </div>
           <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
             {favoriteCount}
@@ -308,7 +310,7 @@ export default function MappingTemplatesPage() {
         </article>
         <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-            Schemas covered
+            {t("mappingTemplates.schemasCovered")}
           </div>
           <div className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[var(--color-ink)]">
             {schemaCount}
@@ -316,10 +318,10 @@ export default function MappingTemplatesPage() {
         </article>
         <article className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[var(--dashboard-panel-bg)] p-5">
           <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-            Latest update
+            {t("mappingTemplates.latestUpdate")}
           </div>
           <div className="mt-3 text-sm font-medium text-[var(--color-ink)]">
-            {latestUpdated ? formatDate(latestUpdated) : "No templates yet"}
+            {latestUpdated ? formatDate(latestUpdated) : t("mappingTemplates.noTemplatesYet")}
           </div>
         </article>
       </section>
@@ -331,7 +333,7 @@ export default function MappingTemplatesPage() {
             type="search"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search templates, schemas, or signatures"
+            placeholder={t("mappingTemplates.searchPlaceholder")}
             className="h-10 pl-9"
           />
         </label>
@@ -343,7 +345,7 @@ export default function MappingTemplatesPage() {
           onClick={() => setFavoritesOnly((current) => !current)}
         >
           <Star className="h-3.5 w-3.5" />
-          Favorites only
+          {t("mappingTemplates.favoritesOnly")}
         </Button>
 
         <Button
@@ -354,15 +356,15 @@ export default function MappingTemplatesPage() {
           disabled={isLoading}
         >
           <RefreshCcw className="h-3.5 w-3.5" />
-          Refresh
+          {t("mappingTemplates.refresh")}
         </Button>
       </section>
 
       <section className="dashboard-section">
         <div className="dashboard-section-head">
           <div>
-            <h2>All mapping templates</h2>
-            <p>{filteredTemplates.length} template{filteredTemplates.length === 1 ? "" : "s"} shown.</p>
+            <h2>{t("mappingTemplates.allTemplates")}</h2>
+            <p>{t("mappingTemplates.templatesShownPlural", { count: String(filteredTemplates.length) })}</p>
           </div>
         </div>
 
@@ -376,30 +378,30 @@ export default function MappingTemplatesPage() {
           </div>
         ) : error ? (
           <div className="rounded-2xl border border-[rgba(180,60,48,0.18)] bg-[rgba(180,60,48,0.05)] p-5 text-sm text-[var(--color-ink)]">
-            Failed to load mapping templates.
+            {t("mappingTemplates.loadFailed")}
           </div>
         ) : filteredTemplates.length === 0 && templates.length > 0 ? (
           <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-[var(--surface-panel-soft)] text-[var(--color-muted)]">
               <LayoutGrid className="h-5 w-5" />
             </div>
             <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
-              No mapping templates match
+              {t("mappingTemplates.noMatch")}
             </h3>
             <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
-              Clear the filter or finish a mapping run to create the first reusable template.
+              {t("mappingTemplates.noMatchDesc")}
             </p>
           </div>
         ) : filteredTemplates.length === 0 ? (
           <div className="rounded-2xl border border-[var(--dashboard-panel-border)] bg-[rgba(252,251,248,0.72)] p-8 text-center">
-            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-white/70 text-[var(--color-muted)]">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full border border-[var(--dashboard-panel-border)] bg-[var(--surface-panel-soft)] text-[var(--color-muted)]">
               <LayoutGrid className="h-5 w-5" />
             </div>
             <h3 className="mt-4 font-[var(--font-display)] text-2xl font-semibold tracking-[-0.03em] text-[var(--color-ink)]">
-              No templates yet
+              {t("mappingTemplates.noTemplatesYet")}
             </h3>
             <p className="mx-auto mt-2 max-w-xl text-sm text-[var(--color-muted)]">
-              Finish a mapping run to create your first reusable template.
+              {t("mappingTemplates.noTemplatesDesc")}
             </p>
           </div>
         ) : (

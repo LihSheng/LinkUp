@@ -8,6 +8,7 @@ import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 import type { CanonicalField } from "@/lib/excel/header-detection";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 export const { POST } = defineApiRouteHandlers({
   POST: async (request: Request) => {
@@ -19,7 +20,7 @@ export const { POST } = defineApiRouteHandlers({
 
     if (!schemaTemplate) {
       return NextResponse.json(
-        { error: "Schema template was not found." },
+        { error: serverT("api.schemaTemplateNotFound") },
         { status: 404 },
       );
     }
@@ -50,7 +51,7 @@ export const { POST } = defineApiRouteHandlers({
 
     if (!uploadedFile) {
       return NextResponse.json(
-        { error: "Uploaded file was not found." },
+        { error: serverT("api.uploadedFileNotFound") },
         { status: 404 },
       );
     }
@@ -87,7 +88,7 @@ export const { POST } = defineApiRouteHandlers({
 
         return NextResponse.json(
           {
-            error: "Required fields are missing from the workbook.",
+            error: serverT("api.requiredFieldsMissing"),
             missingRequiredFields: missing,
             detection: {
               headerRowIndex: detection.headerRowIndex,
@@ -121,10 +122,10 @@ export const { POST } = defineApiRouteHandlers({
           },
           warning:
             detection.headerRowIndex < 0
-              ? "No header row detected. AI will analyze data columns directly."
+              ? serverT("api.noHeaderRowDetected")
               : detection.ambiguous
-                ? "Header detection confidence is low. AI will analyze data columns directly."
-                : "Some required fields were not found in headers. AI will attempt to match from data.",
+                ? serverT("api.headerDetectionLowConfidence")
+                : serverT("api.someRequiredFieldsNotFound"),
           detection: {
             headerRowIndex: detection.headerRowIndex,
             matchedFields: detection.matchedFields,

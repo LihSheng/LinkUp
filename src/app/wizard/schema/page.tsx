@@ -2,6 +2,7 @@
 
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 import useSWR from "swr";
 
 import {
@@ -93,6 +94,7 @@ async function readJson<T>(response: Response): Promise<T> {
 const swrFetcher = async (url: string) => readJson<TemplateListResponse>(await fetch(url));
 
 export default function SchemaStepPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const existingRunId = searchParams.get("runId");
@@ -199,8 +201,8 @@ export default function SchemaStepPage() {
     );
 
     setSelected(result.template.id);
-    toast.success("Template created", {
-      description: `"${result.template.name}" was saved.`,
+    toast.success(t("wizard.schema.createSuccess"), {
+      description: t("wizard.schema.createSuccessDesc", { name: result.template.name }),
     });
   }
 
@@ -236,8 +238,8 @@ export default function SchemaStepPage() {
     );
 
     setSelected(result.template.id);
-    toast.success("Template updated", {
-      description: `"${result.template.name}" was updated.`,
+    toast.success(t("wizard.schema.updateSuccess"), {
+      description: t("wizard.schema.updateSuccessDesc", { name: result.template.name }),
     });
   }
 
@@ -284,12 +286,12 @@ export default function SchemaStepPage() {
       setInspectedTemplateId((current) => (current === template.id ? null : current));
       setEditingTemplate((current) => (current?.id === template.id ? null : current));
 
-      toast.success("Template deleted", {
-        description: `"${deletedTemplate.name}" was deleted.`,
+      toast.success(t("wizard.schema.deleteSuccess"), {
+        description: t("wizard.schema.deleteSuccessDesc", { name: deletedTemplate.name }),
       });
     } catch (error) {
-      toast.error("Template not deleted", {
-        description: error instanceof Error ? error.message : "Unable to delete template.",
+      toast.error(t("wizard.schema.deleteError"), {
+        description: error instanceof Error ? error.message : t("wizard.schema.deleteErrorDesc"),
       });
     } finally {
       setIsDeletingTemplate(false);
@@ -309,29 +311,29 @@ export default function SchemaStepPage() {
   const getStatusText = () => {
     if (isUsingFavorite) {
       const favTemplate = favoriteTemplates.find((t) => t.id === selectedFavoriteTemplateId);
-      return favTemplate ? `Reusing "${favTemplate.name}"` : "Select a schema template to continue";
+      return favTemplate ? t("wizard.schema.statusReusing", { name: favTemplate.name }) : t("wizard.schema.statusSelectTemplate");
     }
     if (isUsingNewProcess && processNameValid) {
-      return `Starting "${processName.trim()}"`;
+      return t("wizard.schema.statusNameProcess", { name: processName.trim() });
     }
     if (selectedTemplate && !isUsingFavorite) {
-      return "Enter a process name to continue";
+      return t("wizard.schema.statusEnterName");
     }
-    return "Select a schema template to continue";
+    return t("wizard.schema.statusSelectTemplate");
   };
 
   async function handlePrimary() {
     if (!selectedTemplate) {
-      toast.error("No template selected", {
-        description: "Please select a schema template before continuing.",
+      toast.error(t("wizard.schema.selectError"), {
+        description: t("wizard.schema.selectErrorDesc"),
       });
       return;
     }
 
     if (!isUsingFavorite && !processNameValid) {
       setTriedContinue(true);
-      toast.error("Process name required", {
-        description: "Enter a name for your new process, or select a favorited mapping template.",
+      toast.error(t("wizard.schema.nameRequiredError"), {
+        description: t("wizard.schema.nameRequiredDesc"),
       });
       return;
     }
@@ -378,8 +380,8 @@ export default function SchemaStepPage() {
       }
       router.push(`/wizard/workbook?${params.toString()}`);
     } catch (err) {
-      toast.error("Failed to create draft", {
-        description: err instanceof Error ? err.message : "Unable to start process.",
+      toast.error(t("wizard.schema.draftError"), {
+        description: err instanceof Error ? err.message : t("wizard.schema.draftErrorDesc"),
       });
     } finally {
       setIsCreatingDraft(false);
@@ -399,14 +401,14 @@ export default function SchemaStepPage() {
 
         {error ? (
           <div className="template-card template-card-new" style={{ cursor: "default" }}>
-            <h3 className="template-card-title">Template load failed</h3>
-            <p className="template-card-desc">{error instanceof Error ? error.message : "Try again."}</p>
+            <h3 className="template-card-title">{t("wizard.schema.loadFailed")}</h3>
+            <p className="template-card-desc">{error instanceof Error ? error.message : t("wizard.schema.loadFailedDetail")}</p>
           </div>
         ) : null}
 
         {!isLoading && templates.length === 0 && !error ? (
           <div className="template-card template-card-new" style={{ cursor: "default" }}>
-            <h3 className="template-card-title">No templates yet</h3>
+            <h3 className="template-card-title">{t("wizard.schema.noTemplates")}</h3>
           </div>
         ) : null}
 
@@ -418,7 +420,7 @@ export default function SchemaStepPage() {
           >
             <button
               type="button"
-              aria-label={`Select ${template.name}`}
+              aria-label={t("wizard.schema.selectLabel", { name: template.name })}
               onClick={() => {
                 setSelected(template.id);
                 setSelectedFavoriteTemplateId(null);
@@ -436,7 +438,7 @@ export default function SchemaStepPage() {
             />
             <button
               type="button"
-              aria-label={`See details for ${template.name}`}
+              aria-label={t("wizard.schema.detailsLabel", { name: template.name })}
               onClick={(event) => {
                 event.stopPropagation();
                 setInspectedTemplateId(template.id);
@@ -472,7 +474,7 @@ export default function SchemaStepPage() {
               </svg>
             </button>
             <h3 className="template-card-title">{template.name}</h3>
-            <p className="template-card-desc">{template.description ?? "No description yet."}</p>
+            <p className="template-card-desc">{template.description ?? t("wizard.schema.noDescription")}</p>
           </div>
         ))}
 
@@ -487,8 +489,8 @@ export default function SchemaStepPage() {
               <line x1="5" y1="12" x2="19" y2="12" />
             </svg>
           </div>
-          <h3 className="template-card-title">Add New Template</h3>
-          <p className="template-card-desc">Create a new saved schema.</p>
+          <h3 className="template-card-title">{t("wizard.schema.addNew")}</h3>
+          <p className="template-card-desc">{t("wizard.schema.addNewDesc")}</p>
         </button>
       </div>
 
@@ -497,7 +499,7 @@ export default function SchemaStepPage() {
           {favoriteTemplates.length > 0 ? (
             <section>
               <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-[0.08em] mb-3">
-                Reuse a saved mapping
+                {t("wizard.schema.reuseSavedMapping")}
               </h3>
               <div className="grid gap-3 sm:grid-cols-2">
                 {favoriteTemplates.map((fav) => (
@@ -533,11 +535,11 @@ export default function SchemaStepPage() {
 
           <section>
             <h3 className="text-sm font-semibold text-[var(--color-muted)] uppercase tracking-[0.08em] mb-3">
-              Start new process
+              {t("wizard.schema.startNewProcess")}
             </h3>
             <label className="grid gap-2">
               <span className="text-sm font-medium">
-                Process name {!isUsingFavorite ? <span className="text-[var(--color-error)]">*</span> : null}
+                {t("wizard.schema.processName")}{!isUsingFavorite ? <span className="text-[var(--color-error)]">*</span> : null}
               </span>
               <Input
                 value={processName}
@@ -546,7 +548,7 @@ export default function SchemaStepPage() {
                   setSelectedFavoriteTemplateId(null);
                   setTriedContinue(false);
                 }}
-                placeholder="e.g. Monthly payroll import Q2 2026"
+                placeholder={t("wizard.schema.processNamePlaceholder")}
                 disabled={isUsingFavorite}
                 className={triedContinue && !processNameValid && !isUsingFavorite ? "border-red-500" : ""}
               />
@@ -558,7 +560,7 @@ export default function SchemaStepPage() {
       <WizardFooter
         statusText={getStatusText()}
         statusReady={canContinue && !isCreatingDraft}
-        primaryLabel={isCreatingDraft ? "Creating draft..." : "Next"}
+        primaryLabel={isCreatingDraft ? t("wizard.schema.creatingDraft") : t("wizard.schema.continue")}
         onPrimary={handlePrimary}
         primaryDisabled={!canContinue || isCreatingDraft}
       />
@@ -610,15 +612,15 @@ export default function SchemaStepPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete template?</AlertDialogTitle>
+            <AlertDialogTitle>{t("wizard.schema.deleteConfirmTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
               {templatePendingDelete
-                ? `This will permanently delete "${templatePendingDelete.name}". This cannot be undone.`
-                : "This template will be permanently deleted. This cannot be undone."}
+                ? t("wizard.schema.deleteConfirmDesc", { name: templatePendingDelete.name })
+                : t("wizard.schema.deleteConfirmDescFallback")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeletingTemplate}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={isDeletingTemplate}>{t("wizard.schema.deleteCancel")}</AlertDialogCancel>
             <AlertDialogAction
               disabled={isDeletingTemplate}
               onClick={(event) => {
@@ -626,7 +628,7 @@ export default function SchemaStepPage() {
                 void handleConfirmDelete();
               }}
             >
-              {isDeletingTemplate ? "Deleting..." : "Delete template"}
+              {isDeletingTemplate ? t("wizard.schema.deleting") : t("wizard.schema.deleteConfirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -646,6 +648,7 @@ function TemplateDetailsModal({
   onDelete: () => void | Promise<void>;
   onClose: () => void;
 }) {
+  const { t } = useTranslation();
   const fields = flattenJsonSchema(template.jsonSchema);
 
   return (
@@ -655,26 +658,26 @@ function TemplateDetailsModal({
         className="w-[calc(100vw-32px)] sm:w-[min(1180px,calc(100vw-32px))] sm:min-w-[960px] sm:max-w-[1180px] h-[calc(100vh-32px)] sm:h-[min(860px,calc(100vh-32px))] sm:min-h-[680px] sm:max-h-[calc(100vh-32px)] p-0 gap-0 overflow-hidden rounded-[22px] grid-rows-[auto_1fr]"
       >
         <DialogHeader
-          className="px-6 py-[18px] bg-white/66 border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
+          className="px-6 py-[18px] bg-[var(--surface-panel)] border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
         >
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--color-muted)] m-0">
-              Saved schema
+              {t("wizard.schema.savedSchema")}
             </p>
             <DialogTitle className="mt-1.5 text-lg">{template.name}</DialogTitle>
             <DialogDescription className="mt-1.5">
-              {template.description ?? "No description yet."}
+              {template.description ?? t("wizard.schema.noDescription")}
             </DialogDescription>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Button variant="outline" onClick={onEdit}>
-              Edit template
+              {t("wizard.schema.editTemplate")}
             </Button>
             <Button
               variant="destructive"
               onClick={onDelete}
             >
-              Delete template
+              {t("wizard.schema.deleteTemplate")}
             </Button>
             <DialogClose
               render={
@@ -682,7 +685,7 @@ function TemplateDetailsModal({
                   variant="ghost"
                   size="icon"
                   className="rounded-full"
-                  aria-label="Close schema details"
+                  aria-label={t("wizard.schema.closeDetails")}
                 />
               }
             >
@@ -697,15 +700,15 @@ function TemplateDetailsModal({
         <div className="grid grid-cols-[minmax(0,1.05fr)_420px] flex-1 min-h-0">
           <section className="p-6 min-h-0 overflow-auto">
             <div className="flex justify-between items-center gap-3 mb-4">
-              <h4 className="m-0 text-sm font-semibold">Columns</h4>
-              <span className="text-[var(--color-muted)] text-sm">{fields.length} fields</span>
+              <h4 className="m-0 text-sm font-semibold">{t("wizard.schema.columns")}</h4>
+              <span className="text-[var(--color-muted)] text-sm">{fields.length} {t("wizard.schema.fields")}</span>
             </div>
 
             <div className="border border-[var(--color-border)] rounded-[16px] overflow-hidden">
               <div className="grid grid-cols-[1.4fr_0.6fr_0.4fr] gap-3 px-4 py-3 bg-[rgba(28,28,28,0.03)] text-[var(--color-muted)] text-[0.78rem] uppercase tracking-[0.08em]">
-                <span className="min-w-0">Field</span>
-                <span className="min-w-0">Type</span>
-                <span className="min-w-0">Required</span>
+                <span className="min-w-0">{t("wizard.schema.field")}</span>
+                <span className="min-w-0">{t("wizard.schema.type")}</span>
+                <span className="min-w-0">{t("wizard.schema.required")}</span>
               </div>
               {fields.length > 0 ? (
                 fields.map((field) => (
@@ -715,17 +718,17 @@ function TemplateDetailsModal({
                   >
                     <span className="min-w-0 truncate text-[var(--color-ink)]">{field.path}</span>
                     <span className="min-w-0 text-[var(--color-muted)]">{field.type}</span>
-                    <span className="min-w-0 text-[var(--color-muted)]">{field.required ? "Yes" : "No"}</span>
+                    <span className="min-w-0 text-[var(--color-muted)]">{field.required ? t("wizard.schema.yes") : t("wizard.schema.no")}</span>
                   </div>
                 ))
               ) : (
-                <div className="p-4 text-[var(--color-muted)]">No fields found.</div>
+                <div className="p-4 text-[var(--color-muted)]">{t("wizard.schema.noFields")}</div>
               )}
             </div>
           </section>
 
           <aside className="p-6 border-l border-[var(--color-border)] bg-[rgba(252,251,248,0.98)] min-h-0 overflow-hidden grid gap-3 content-start">
-            <h4 className="m-0 text-sm font-semibold">Schema JSON</h4>
+            <h4 className="m-0 text-sm font-semibold">{t("wizard.schema.schemaJson")}</h4>
             <pre
               className="m-0 p-4 rounded-[14px] bg-[rgba(247,244,237,0.9)] border border-[var(--color-border)] text-[var(--color-ink)] overflow-auto text-[0.82rem] leading-[1.7] whitespace-pre"
               style={{ maxHeight: "calc(100vh - 200px)" }}

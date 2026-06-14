@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useCallback, useMemo } from "react";
+import { useState, useCallback } from "react";
+import { useTranslation } from "react-i18next";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import {
   Select,
   SelectContent,
@@ -20,12 +21,12 @@ import {
   XIcon,
   Settings2,
   Cpu,
-  AlertTriangle,
   Loader2,
   CheckCircle2,
   XCircle,
   PlugZap,
 } from "lucide-react";
+import { applyAppearance } from "@/lib/theme";
 
 type Appearance = "light" | "dark" | "system";
 type ResponseLength = "concise" | "balanced" | "detailed";
@@ -58,17 +59,12 @@ interface SidebarSection {
 }
 
 const SIDEBAR_SECTIONS: SidebarSection[] = [
-  { id: "general", label: "General", icon: Settings2 },
-  { id: "model", label: "Model Settings", icon: Cpu },
+  { id: "general", label: "settings.general", icon: Settings2 },
+  { id: "model", label: "settings.modelSettings", icon: Cpu },
 ];
 
 const LANGUAGES = [
-  { value: "en", label: "English" },
-  { value: "es", label: "Spanish" },
-  { value: "fr", label: "French" },
-  { value: "de", label: "German" },
-  { value: "zh", label: "Chinese" },
-  { value: "ja", label: "Japanese" },
+  { value: "en", key: "locale.en" },
 ];
 
 const TIMEZONES = [
@@ -88,23 +84,23 @@ const TIMEZONES = [
 ];
 
 const MODELS = [
-  { value: "gpt-4o", label: "GPT-4o", provider: "openai" },
-  { value: "gpt-4o-mini", label: "GPT-4o Mini", provider: "openai" },
-  { value: "claude-3.5-sonnet", label: "Claude 3.5 Sonnet", provider: "anthropic" },
-  { value: "claude-3.5-haiku", label: "Claude 3.5 Haiku", provider: "anthropic" },
-  { value: "gemini-2.0-pro", label: "Gemini 2.0 Pro", provider: "google" },
+  { value: "gpt-4o", key: "settings.model.modelGpt4o", provider: "openai" },
+  { value: "gpt-4o-mini", key: "settings.model.modelGpt4oMini", provider: "openai" },
+  { value: "claude-3.5-sonnet", key: "settings.model.modelClaude35Sonnet", provider: "anthropic" },
+  { value: "claude-3.5-haiku", key: "settings.model.modelClaude35Haiku", provider: "anthropic" },
+  { value: "gemini-2.0-pro", key: "settings.model.modelGemini20Pro", provider: "google" },
 ];
 
 const PROVIDERS = [
-  { value: "openai", label: "OpenAI" },
-  { value: "anthropic", label: "Anthropic" },
-  { value: "google", label: "Google" },
+  { value: "openai", key: "settings.model.providerOpenai" },
+  { value: "anthropic", key: "settings.model.providerAnthropic" },
+  { value: "google", key: "settings.model.providerGoogle" },
 ];
 
-const RESPONSE_LENGTHS: { value: ResponseLength; label: string; desc: string }[] = [
-  { value: "concise", label: "Concise", desc: "Short, direct responses" },
-  { value: "balanced", label: "Balanced", desc: "Moderate detail" },
-  { value: "detailed", label: "Detailed", desc: "Comprehensive answers" },
+const RESPONSE_LENGTHS: { value: ResponseLength; labelKey: string; descKey: string }[] = [
+  { value: "concise", labelKey: "settings.model.concise", descKey: "settings.model.conciseDesc" },
+  { value: "balanced", labelKey: "settings.model.balanced", descKey: "settings.model.balancedDesc" },
+  { value: "detailed", labelKey: "settings.model.detailed", descKey: "settings.model.detailedDesc" },
 ];
 
 const STORAGE_KEY = "linkup-settings";
@@ -174,7 +170,7 @@ function Toggle({
     >
       <span
         className={cn(
-          "inline-block h-3.5 w-3.5 transform rounded-full bg-white transition-transform",
+          "inline-block h-3.5 w-3.5 transform rounded-full bg-[var(--color-on-ink)] transition-transform",
           checked ? "translate-x-[18px]" : "translate-x-[3px]"
         )}
       />
@@ -197,65 +193,37 @@ type ConnectionTestResult = {
 };
 
 export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
-  const [savedSettings, setSavedSettings] = useState<Settings>(loadSettings);
-  const [stagedSettings, setStagedSettings] = useState<Settings>(savedSettings);
+  const { t } = useTranslation();
+  const [settings, setSettings] = useState<Settings>(loadSettings);
   const [activeSection, setActiveSection] = useState<SectionId>("general");
-  const [pendingClose, setPendingClose] = useState(false);
   const [connectionTest, setConnectionTest] = useState<ConnectionTestResult>({
     status: "idle",
   });
 
-  const isDirty = useMemo(
-    () => JSON.stringify(stagedSettings) !== JSON.stringify(savedSettings),
-    [stagedSettings, savedSettings]
-  );
-
-  const handleRequestClose = useCallback(() => {
-    if (isDirty) {
-      setPendingClose(true);
-    } else {
-      onClose();
-    }
-  }, [isDirty, onClose]);
-
-  const handleSave = useCallback(() => {
-    persistSettings(stagedSettings);
-    setSavedSettings({ ...stagedSettings });
-  }, [stagedSettings]);
-
-  const handleDiscard = useCallback(() => {
-    setStagedSettings({ ...savedSettings });
-  }, [savedSettings]);
-
-  const handleConfirmDiscardAndClose = useCallback(() => {
-    setStagedSettings({ ...savedSettings });
-    setPendingClose(false);
-    onClose();
-  }, [savedSettings, onClose]);
-
-  const handleCancelClose = useCallback(() => {
-    setPendingClose(false);
-  }, []);
-
   const updateGeneral = useCallback((partial: Partial<GeneralSettings>) => {
-    setStagedSettings((prev) => ({
-      ...prev,
-      general: { ...prev.general, ...partial },
-    }));
+    setSettings((prev) => {
+      const next = { ...prev, general: { ...prev.general, ...partial } };
+      persistSettings(next);
+      if (partial.appearance) {
+        applyAppearance(next.general.appearance);
+      }
+      return next;
+    });
   }, []);
 
   const updateModel = useCallback((partial: Partial<ModelSettings>) => {
-    setStagedSettings((prev) => ({
-      ...prev,
-      model: { ...prev.model, ...partial },
-    }));
+    setSettings((prev) => {
+      const next = { ...prev, model: { ...prev.model, ...partial } };
+      persistSettings(next);
+      return next;
+    });
   }, []);
 
   const handleOpenChange = useCallback(
     (open: boolean) => {
-      if (!open) handleRequestClose();
+      if (!open) onClose();
     },
-    [handleRequestClose]
+    [onClose]
   );
 
   const handleTestConnection = useCallback(async () => {
@@ -282,10 +250,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
     } catch (err) {
       setConnectionTest({
         status: "failed",
-        error: err instanceof Error ? err.message : "Failed to reach the server",
+        error: err instanceof Error ? err.message : t("settings.model.serverUnreachable"),
       });
     }
-  }, []);
+  }, [t]);
 
 
   return (
@@ -297,17 +265,17 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           "bg-[var(--color-cream)] text-[var(--color-ink)] ring-[var(--color-border)]"
         )}
       >
-        <DialogTitle className="sr-only">Settings</DialogTitle>
+        <DialogTitle className="sr-only">{t("settings.title")}</DialogTitle>
 
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-5 pt-4 pb-3 shrink-0">
           <h2 className="font-heading text-base font-semibold text-[var(--color-ink)]">
-            Settings
+            {t("settings.title")}
           </h2>
           <button
             type="button"
-            onClick={handleRequestClose}
-            aria-label="Close settings"
+            onClick={onClose}
+            aria-label={t("settings.close")}
             className="flex size-7 items-center justify-center rounded-md text-[var(--color-muted)] hover:bg-[var(--color-ink-06)] hover:text-[var(--color-ink)] transition-colors"
           >
             <XIcon className="size-4" />
@@ -318,7 +286,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
         <div className="flex flex-1 min-h-0 border-y border-[var(--color-border)]">
           {/* Sidebar */}
           <nav
-            aria-label="Settings sections"
+            aria-label={t("aria.settingsSections")}
             className="hidden sm:flex flex-col w-[200px] shrink-0 border-r border-[var(--color-border)] py-3 overflow-y-auto"
           >
             {SIDEBAR_SECTIONS.map((section) => {
@@ -339,7 +307,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   )}
                 >
                   <Icon className="size-4 shrink-0" />
-                  <span className="truncate">{section.label}</span>
+                  <span className="truncate">{t(section.label)}</span>
                 </button>
               );
             })}
@@ -355,15 +323,15 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                   key={section.id}
                   type="button"
                   onClick={() => setActiveSection(section.id)}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors",
-                    isActive
-                      ? "bg-[var(--color-ink)] text-[var(--color-cream-soft)]"
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs whitespace-nowrap transition-colors",
+                      isActive
+                      ? "bg-[var(--color-ink)] text-[var(--color-on-ink)]"
                       : "text-[var(--color-muted)] hover:bg-[var(--color-ink-06)]"
-                  )}
+                    )}
                 >
                   <Icon className="size-3.5" />
-                  {section.label}
+                  {t(section.label)}
                 </button>
               );
             })}
@@ -375,16 +343,16 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               <div className="space-y-5">
                 <div>
                   <h3 className="text-sm font-medium text-[var(--color-ink)] mb-3">
-                    General
+                    {t("settings.general")}
                   </h3>
                   <div className="space-y-4">
                     {/* Appearance */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="appearance" className="text-sm text-[var(--color-muted)] font-normal">
-                        Appearance
+                        {t("settings.appearance")}
                       </Label>
                       <Select
-                        value={stagedSettings.general.appearance}
+                        value={settings.general.appearance}
                         onValueChange={(v) => v && updateGeneral({ appearance: v as Appearance })}
                       >
                         <SelectTrigger
@@ -394,9 +362,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="light">Light</SelectItem>
-                          <SelectItem value="dark">Dark</SelectItem>
-                          <SelectItem value="system">System</SelectItem>
+                          <SelectItem value="light">{t("settings.light")}</SelectItem>
+                          <SelectItem value="dark">{t("settings.dark")}</SelectItem>
+                          <SelectItem value="system">{t("settings.system")}</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -404,10 +372,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     {/* Language */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="language" className="text-sm text-[var(--color-muted)] font-normal">
-                        Language
+                        {t("settings.language")}
                       </Label>
                       <Select
-                        value={stagedSettings.general.language}
+                        value={settings.general.language}
                         onValueChange={(v) => v && updateGeneral({ language: v })}
                       >
                         <SelectTrigger
@@ -419,7 +387,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                         <SelectContent>
                           {LANGUAGES.map((lang) => (
                             <SelectItem key={lang.value} value={lang.value}>
-                              {lang.label}
+                              {t(lang.key)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -429,10 +397,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     {/* Timezone */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="timezone" className="text-sm text-[var(--color-muted)] font-normal">
-                        Timezone
+                        {t("settings.timezone")}
                       </Label>
                       <Select
-                        value={stagedSettings.general.timezone}
+                        value={settings.general.timezone}
                         onValueChange={(v) => v && updateGeneral({ timezone: v })}
                       >
                         <SelectTrigger
@@ -455,15 +423,15 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     <div className="flex items-center justify-between gap-4">
                       <div>
                         <Label htmlFor="auto-sync" className="text-sm text-[var(--color-muted)] font-normal">
-                          Automatic workflow sync
+                          {t("settings.autoSync")}
                         </Label>
                         <p className="text-xs text-[var(--color-muted)] mt-0.5 opacity-70">
-                          Sync mappings automatically as changes are made
+                          {t("settings.autoSyncDesc")}
                         </p>
                       </div>
                       <Toggle
                         id="auto-sync"
-                        checked={stagedSettings.general.autoSync}
+                        checked={settings.general.autoSync}
                         onChange={(v) => updateGeneral({ autoSync: v })}
                       />
                     </div>
@@ -476,16 +444,16 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
               <div className="space-y-5">
                 <div>
                   <h3 className="text-sm font-medium text-[var(--color-ink)] mb-3">
-                    Model Settings
+                    {t("settings.model.title")}
                   </h3>
                   <div className="space-y-4">
                     {/* Provider */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="provider" className="text-sm text-[var(--color-muted)] font-normal">
-                        Provider
+                        {t("settings.model.provider")}
                       </Label>
                       <Select
-                        value={stagedSettings.model.provider}
+                        value={settings.model.provider}
                         onValueChange={(v) => v && updateModel({ provider: v })}
                       >
                         <SelectTrigger
@@ -497,7 +465,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                         <SelectContent>
                           {PROVIDERS.map((p) => (
                             <SelectItem key={p.value} value={p.value}>
-                              {p.label}
+                              {t(p.key)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -507,10 +475,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     {/* Default Model */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="default-model" className="text-sm text-[var(--color-muted)] font-normal">
-                        Default model
+                        {t("settings.model.defaultModel")}
                       </Label>
                       <Select
-                        value={stagedSettings.model.defaultModel}
+                        value={settings.model.defaultModel}
                         onValueChange={(v) => v && updateModel({ defaultModel: v })}
                       >
                         <SelectTrigger
@@ -524,9 +492,9 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                             <SelectItem
                               key={m.value}
                               value={m.value}
-                              disabled={m.provider !== stagedSettings.model.provider}
+                              disabled={m.provider !== settings.model.provider}
                             >
-                              {m.label}
+                              {t(m.key)}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -536,17 +504,17 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                     {/* Temperature */}
                     <div className="flex items-center justify-between gap-4">
                       <Label htmlFor="temperature" className="text-sm text-[var(--color-muted)] font-normal">
-                        Creativity
+                        {t("settings.model.creativity")}
                       </Label>
                       <div className="flex items-center gap-3 w-[180px]">
-                        <span className="text-xs text-[var(--color-muted)]">Precise</span>
+                        <span className="text-xs text-[var(--color-muted)]">{t("settings.model.precise")}</span>
                         <input
                           id="temperature"
                           type="range"
                           min="0"
                           max="1"
                           step="0.1"
-                          value={stagedSettings.model.temperature}
+                          value={settings.model.temperature}
                           onChange={(e) =>
                             updateModel({ temperature: parseFloat(e.target.value) })
                           }
@@ -554,34 +522,34 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                             [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:size-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[var(--color-ink)] [&::-webkit-slider-thumb]:shadow-[var(--shadow-focus)]
                             [&::-moz-range-thumb]:size-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[var(--color-ink)] [&::-moz-range-thumb]:border-0"
                         />
-                        <span className="text-xs text-[var(--color-muted)]">Creative</span>
+                        <span className="text-xs text-[var(--color-muted)]">{t("settings.model.creative")}</span>
                       </div>
                     </div>
 
                     {/* Response Length */}
                     <div>
                       <Label className="text-sm text-[var(--color-muted)] font-normal mb-2 block">
-                        Response length
+                        {t("settings.model.responseLength")}
                       </Label>
                       <div className="flex gap-2">
-                        {RESPONSE_LENGTHS.map((rl) => (
-                          <button
-                            key={rl.value}
-                            type="button"
-                            onClick={() => updateModel({ responseLength: rl.value })}
-                            className={cn(
-                              "flex-1 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
-                              stagedSettings.model.responseLength === rl.value
-                                ? "border-[var(--color-ink)] bg-[var(--color-ink-06)] text-[var(--color-ink)]"
-                                : "border-[var(--color-border)] bg-transparent text-[var(--color-muted)] hover:border-[var(--color-ink-40)] hover:text-[var(--color-ink)]"
-                            )}
-                          >
-                            <span className="font-medium block">{rl.label}</span>
-                            <span className="text-xs opacity-70 mt-0.5 block">
-                              {rl.desc}
-                            </span>
-                          </button>
-                        ))}
+                          {RESPONSE_LENGTHS.map((rl) => (
+                            <button
+                              key={rl.value}
+                              type="button"
+                              onClick={() => updateModel({ responseLength: rl.value })}
+                              className={cn(
+                                "flex-1 rounded-lg border px-3 py-2 text-left text-sm transition-colors",
+                                settings.model.responseLength === rl.value
+                                  ? "border-[var(--color-ink)] bg-[var(--color-ink-06)] text-[var(--color-ink)]"
+                                  : "border-[var(--color-border)] bg-transparent text-[var(--color-muted)] hover:border-[var(--color-ink-40)] hover:text-[var(--color-ink)]"
+                              )}
+                            >
+                              <span className="font-medium block">{t(rl.labelKey)}</span>
+                              <span className="text-xs opacity-70 mt-0.5 block">
+                                {t(rl.descKey)}
+                              </span>
+                            </button>
+                          ))}
                       </div>
                     </div>
 
@@ -590,10 +558,10 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                       <div className="flex items-center justify-between gap-4">
                         <div>
                           <span className="text-sm text-[var(--color-muted)] font-normal">
-                            Connection test
+                            {t("settings.model.connectionTest")}
                           </span>
                           <p className="text-xs text-[var(--color-muted)] mt-0.5 opacity-70">
-                            Verify the LLM provider is reachable
+                            {t("settings.model.connectionTestDesc")}
                           </p>
                         </div>
                         <Button
@@ -606,12 +574,12 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           {connectionTest.status === "testing" ? (
                             <>
                               <Loader2 className="size-3.5 animate-spin" />
-                              Testing...
+                              {t("settings.model.testing")}
                             </>
                           ) : (
                             <>
                               <PlugZap className="size-3.5" />
-                              Test connection
+                              {t("settings.model.testConnection")}
                             </>
                           )}
                         </Button>
@@ -622,7 +590,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           <CheckCircle2 className="size-4 shrink-0 text-[var(--color-success)] mt-px" />
                           <div>
                             <span className="font-medium text-[var(--color-success)]">
-                              Connected
+                              {t("settings.model.connected")}
                             </span>
                             <span className="text-[var(--color-muted)] ml-1">
                               {connectionTest.provider} / {connectionTest.model}
@@ -638,7 +606,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
                           <XCircle className="size-4 shrink-0 text-[var(--color-error)] mt-px" />
                           <div>
                             <span className="font-medium text-[var(--color-error)]">
-                              Connection failed
+                              {t("settings.model.connectionFailed")}
                             </span>
                             {connectionTest.error && (
                               <span className="text-[var(--color-error)] ml-1">
@@ -663,62 +631,7 @@ export function SettingsDialog({ isOpen, onClose }: SettingsDialogProps) {
           </div>
         </div>
 
-        {/* ── Footer ── */}
-        <div className="flex items-center justify-between px-5 py-3 shrink-0">
-          {pendingClose ? (
-            <>
-              <div className="flex items-center gap-2 text-sm text-[var(--color-warning)]">
-                <AlertTriangle className="size-4" />
-                <span>You have unsaved changes</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleCancelClose}
-                >
-                  Keep editing
-                </Button>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleConfirmDiscardAndClose}
-                  className="bg-[var(--color-error)] text-white hover:opacity-80"
-                >
-                  Discard changes
-                </Button>
-              </div>
-            </>
-          ) : (
-            <>
-              <div>
-                {isDirty && (
-                  <span className="text-xs text-[var(--color-muted)]">
-                    Unsaved changes
-                  </span>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleDiscard}
-                  disabled={!isDirty}
-                >
-                  Discard
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={handleSave}
-                  disabled={!isDirty}
-                  className="bg-[var(--color-ink)] text-[var(--color-cream-soft)] hover:opacity-80 shadow-[var(--shadow-button-inset)]"
-                >
-                  Save changes
-                </Button>
-              </div>
-            </>
-          )}
-        </div>
+
       </DialogContent>
     </Dialog>
   );

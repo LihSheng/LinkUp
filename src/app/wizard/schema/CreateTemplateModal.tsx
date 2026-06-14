@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 import * as XLSX from "xlsx";
 
 import {
@@ -176,6 +177,7 @@ export function CreateTemplateModal({
   onCreateTemplate,
   initialTemplate,
 }: CreateTemplateModalProps) {
+  const { t } = useTranslation();
   const [templateName, setTemplateName] = useState(
     initialTemplate?.name ?? "",
   );
@@ -229,26 +231,26 @@ export function CreateTemplateModal({
     const description = templateDescription.trim();
 
     if (!name) {
-      errors.push("Template name is required.");
+      errors.push(t("wizard.createTemplate.errorName"));
     }
 
     if (!description) {
-      errors.push("Template description is required.");
+      errors.push(t("wizard.createTemplate.errorDescription"));
     }
 
     if (fields.length === 0) {
-      errors.push("At least one field is required.");
+      errors.push(t("wizard.createTemplate.errorFields"));
     }
 
     const emptySourceHeaders = fields.filter((f) => !f.sourceHeader.trim());
     const emptyFieldNames = fields.filter((f) => !f.fieldName.trim());
 
     if (emptySourceHeaders.length > 0) {
-      errors.push("Source header cannot be empty.");
+      errors.push(t("wizard.createTemplate.errorSourceHeader"));
     }
 
     if (emptyFieldNames.length > 0) {
-      errors.push("Field name cannot be empty.");
+      errors.push(t("wizard.createTemplate.errorFieldName"));
     }
 
     if (errors.length > 0) {
@@ -270,7 +272,7 @@ export function CreateTemplateModal({
       onClose();
     } catch (caughtError) {
       setError(
-        caughtError instanceof Error ? caughtError.message : "Unable to create schema template.",
+        caughtError instanceof Error ? caughtError.message : t("wizard.createTemplate.errorCreate"),
       );
     } finally {
       setSaving(false);
@@ -284,11 +286,11 @@ export function CreateTemplateModal({
         className="max-w-[1120px] sm:max-w-[1120px] w-full h-[calc(100vh-56px)] sm:h-[min(760px,calc(100vh-56px))] max-h-[calc(100vh-56px)] p-0 gap-0 overflow-hidden rounded-[22px] grid-rows-[auto_1fr_auto]"
       >
         <DialogHeader
-          className="px-8 py-4 bg-white/66 border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
+          className="px-8 py-4 bg-[var(--surface-panel)] border-b border-[var(--color-border)] flex flex-row items-start justify-between gap-4"
         >
           <div className="min-w-0">
             <DialogTitle className="text-[1.05rem] leading-snug">
-              {initialTemplate ? "Edit Saved Template" : "Create Custom Template"}
+              {initialTemplate ? t("wizard.createTemplate.titleEdit") : t("wizard.createTemplate.titleCreate")}
             </DialogTitle>
             <DialogDescription className="mt-1 text-[0.92rem] leading-snug">
               {templateDescription}
@@ -300,7 +302,7 @@ export function CreateTemplateModal({
                 variant="ghost"
                 size="icon"
                 className="rounded-full shrink-0"
-                aria-label="Close custom template modal"
+                aria-label={t("wizard.createTemplate.closeAriaLabel")}
               />
             }
           >
@@ -315,19 +317,19 @@ export function CreateTemplateModal({
           className="flex-1 min-h-0 grid grid-cols-[minmax(0,1fr)_360px] overflow-hidden"
         >
           <div
-            className="min-h-0 overflow-y-auto px-8 py-5 pb-8 bg-white/32"
+            className="min-h-0 overflow-y-auto px-8 py-5 pb-8 bg-[var(--surface-panel-soft)]"
           >
             <section>
               <div className="flex gap-3 justify-between items-stretch">
                 <label className="grid gap-2 flex-1">
-                  <span className="text-sm font-medium">Template Name</span>
+                  <span className="text-sm font-medium">{t("wizard.createTemplate.templateName")}</span>
                   <Input
                     value={templateName}
                     onChange={(event) => {
                       setTemplateName(event.target.value);
                       setTriedSave(false);
                     }}
-                    placeholder="e.g. Employee Import Template"
+                    placeholder={t("wizard.createTemplate.templateNamePlaceholder")}
                     className={cn(
                       "h-auto rounded-xl px-4 py-3.5",
                       triedSave && !templateName.trim() && "border-red-500 ring-red-500/50",
@@ -335,14 +337,14 @@ export function CreateTemplateModal({
                   />
                 </label>
                 <label className="grid gap-2 flex-[1.4]">
-                  <span className="text-sm font-medium">Template Description</span>
+                  <span className="text-sm font-medium">{t("wizard.createTemplate.templateDescription")}</span>
                   <Input
                     value={templateDescription}
                     onChange={(event) => {
                       setTemplateDescription(event.target.value);
                       setTriedSave(false);
                     }}
-                    placeholder="e.g. Fields for importing employee records"
+                    placeholder={t("wizard.createTemplate.templateDescriptionPlaceholder")}
                     className={cn(
                       "h-auto rounded-xl px-4 py-3.5",
                       triedSave && !templateDescription.trim() && "border-red-500 ring-red-500/50",
@@ -354,10 +356,10 @@ export function CreateTemplateModal({
 
             <section className="mt-8">
               <div className="flex items-center gap-3">
-                <span className="size-7 rounded-full bg-[var(--color-ink)] text-white grid place-items-center text-xs font-bold shrink-0">
+                <span className="size-7 rounded-full bg-[var(--color-ink)] text-[var(--color-on-ink)] grid place-items-center text-xs font-bold shrink-0">
                   1
                 </span>
-                <h4 className="m-0 text-sm font-semibold">Upload Sample</h4>
+                <h4 className="m-0 text-sm font-semibold">{t("wizard.createTemplate.uploadSample")}</h4>
               </div>
 
               <input
@@ -375,7 +377,7 @@ export function CreateTemplateModal({
                     const firstSheetName = workbook.SheetNames[0];
 
                     if (!firstSheetName) {
-                      throw new Error("The workbook does not contain any sheets.");
+                      throw new Error(t("wizard.createTemplate.errorNoSheets"));
                     }
 
                     const firstSheet = workbook.Sheets[firstSheetName];
@@ -389,7 +391,7 @@ export function CreateTemplateModal({
 
                     if (detectedFields.length === 0) {
                       throw new Error(
-                        "Could not detect a usable header row in the selected file.",
+                        t("wizard.createTemplate.errorNoHeader"),
                       );
                     }
 
@@ -400,7 +402,7 @@ export function CreateTemplateModal({
                     setError(
                       caughtError instanceof Error
                         ? caughtError.message
-                        : "Unable to read the selected spreadsheet.",
+                        : t("wizard.createTemplate.errorReadFile"),
                     );
                   } finally {
                     event.target.value = "";
@@ -418,7 +420,7 @@ export function CreateTemplateModal({
                   }
                 }}
               >
-                <div className="size-12 rounded-full shrink-0 grid place-items-center bg-white/92 border border-[rgba(236,234,228,0.92)] text-[var(--color-ink)]">
+                <div className="size-12 rounded-full shrink-0 grid place-items-center bg-[var(--surface-panel)] border border-[var(--color-border)] text-[var(--color-ink)]">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" width="20" height="20">
                     <path d="M7 18a4 4 0 0 1-.4-7.98A5.5 5.5 0 0 1 17 8.5h.5a3.5 3.5 0 1 1 0 7H7Z" />
                     <path d="M12 8v8" />
@@ -426,9 +428,9 @@ export function CreateTemplateModal({
                   </svg>
                 </div>
                 <div className="flex-1 text-left">
-                  <p className="font-semibold m-0">Drop a .csv or .xlsx file here</p>
-                  <p className="text-[#6f726f] text-[0.85rem] mt-1 m-0">
-                    Auto-detect fields and data types
+                  <p className="font-semibold m-0">{t("wizard.createTemplate.dropFile")}</p>
+                  <p className="text-[var(--color-muted)] text-[0.85rem] mt-1 m-0">
+                    {t("wizard.createTemplate.autoDetect")}
                   </p>
                 </div>
                 <Button
@@ -440,7 +442,7 @@ export function CreateTemplateModal({
                     fileInputRef.current?.click();
                   }}
                 >
-                  Browse Files
+                  {t("wizard.createTemplate.browseFiles")}
                 </Button>
               </div>
             </section>
@@ -448,10 +450,10 @@ export function CreateTemplateModal({
             <section className="mt-8">
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <span className="size-7 rounded-full bg-[var(--color-ink)] text-white grid place-items-center text-xs font-bold shrink-0">
+                  <span className="size-7 rounded-full bg-[var(--color-ink)] text-[var(--color-on-ink)] grid place-items-center text-xs font-bold shrink-0">
                     2
                   </span>
-                  <h4 className="m-0 text-sm font-semibold">Field Configuration</h4>
+                  <h4 className="m-0 text-sm font-semibold">{t("wizard.createTemplate.fieldConfig")}</h4>
                 </div>
                 <Button
                   type="button"
@@ -471,25 +473,25 @@ export function CreateTemplateModal({
                     <line x1="12" y1="5" x2="12" y2="19" />
                     <line x1="5" y1="12" x2="19" y2="12" />
                   </svg>
-                  Add Field
+                  {t("wizard.createTemplate.addField")}
                 </Button>
               </div>
 
               {triedSave && fields.length === 0 && (
                 <p className="mt-3 text-[0.85rem] text-red-500">
-                  Add at least one field or upload a file to auto-detect fields.
+                  {t("wizard.createTemplate.addFieldError")}
                 </p>
               )}
 
-              <div className="mt-4 border border-[var(--color-border)] rounded-[18px] overflow-hidden bg-white/92 shadow-[0_10px_32px_rgba(28,28,28,0.05)]">
+              <div className="mt-4 border border-[var(--color-border)] rounded-[18px] overflow-hidden bg-[var(--surface-panel)] shadow-[0_10px_32px_rgba(28,28,28,0.05)]">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead className="whitespace-nowrap px-4 py-2.5">Source Header</TableHead>
-                      <TableHead className="whitespace-nowrap px-4 py-2.5">Field Name</TableHead>
-                      <TableHead className="whitespace-nowrap px-4 py-2.5">Data Type</TableHead>
-                      <TableHead className="text-center whitespace-nowrap px-4 py-2.5">Req.</TableHead>
-                      <TableHead className="whitespace-nowrap px-4 py-2.5">Actions</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">{t("wizard.createTemplate.sourceHeader")}</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">{t("wizard.createTemplate.fieldName")}</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">{t("wizard.createTemplate.dataType")}</TableHead>
+                      <TableHead className="text-center whitespace-nowrap px-4 py-2.5">{t("wizard.createTemplate.req")}</TableHead>
+                      <TableHead className="whitespace-nowrap px-4 py-2.5">{t("wizard.createTemplate.actions")}</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -502,7 +504,7 @@ export function CreateTemplateModal({
                               updateField(field.id, "sourceHeader", event.target.value);
                               setTriedSave(false);
                             }}
-                            placeholder="e.g. Full Name"
+                            placeholder={t("wizard.createTemplate.sourceHeaderPlaceholder")}
                             className={cn(
                               "h-auto rounded-[10px] px-3 py-2 font-mono text-[0.9rem]",
                               triedSave && !field.sourceHeader.trim() && "border-red-500 ring-red-500/50",
@@ -516,7 +518,7 @@ export function CreateTemplateModal({
                               updateField(field.id, "fieldName", event.target.value);
                               setTriedSave(false);
                             }}
-                            placeholder="e.g. firstName"
+                            placeholder={t("wizard.createTemplate.fieldNamePlaceholder")}
                             className={cn(
                               "h-auto rounded-[10px] px-3 py-2",
                               triedSave && !field.fieldName.trim() && "border-red-500 ring-red-500/50",
@@ -558,7 +560,7 @@ export function CreateTemplateModal({
                             type="button"
                             variant="ghost"
                             size="icon"
-                            aria-label={`Delete ${field.fieldName}`}
+                            aria-label={t("wizard.createTemplate.deleteField", { name: field.fieldName })}
                             onClick={() => removeField(field.id)}
                             className="text-[#ba1a1a]"
                           >
@@ -595,7 +597,7 @@ export function CreateTemplateModal({
                 <path d="m8 9-3 3 3 3" />
                 <path d="m16 9 3 3-3 3" />
               </svg>
-              <h4 className="m-0 text-sm">Schema Preview</h4>
+              <h4 className="m-0 text-sm">{t("wizard.createTemplate.schemaPreview")}</h4>
             </div>
 
             <div
@@ -604,7 +606,7 @@ export function CreateTemplateModal({
               <span
                 className="absolute top-3 right-3 bg-[rgba(28,28,28,0.04)] px-[10px] py-1 rounded-[6px] text-[0.75rem] font-bold tracking-[0.05em] text-[var(--color-ink)]"
               >
-                JSON
+                {t("wizard.createTemplate.json")}
               </span>
               <pre
                 className="m-0 pt-7 text-[0.82rem] leading-[1.6] text-[var(--color-ink)] whitespace-pre overflow-auto max-h-full"
@@ -614,9 +616,9 @@ export function CreateTemplateModal({
             </div>
 
             <div
-              className="p-3.5 border border-[rgba(236,234,228,0.98)] rounded-[14px] bg-white/58 text-[#6f726f] leading-snug text-[0.8rem]"
+              className="p-3.5 border border-[var(--color-border)] rounded-[14px] bg-[var(--surface-panel-soft)] text-[var(--color-muted)] leading-snug text-[0.8rem]"
             >
-              <strong>Tip:</strong> Use dot notation for nested fields like user.address.
+              <strong>{t("wizard.createTemplate.tip")}</strong> {t("wizard.createTemplate.tipContent")}
             </div>
 
             {error ? (
@@ -631,12 +633,12 @@ export function CreateTemplateModal({
 
         <DialogFooter
           showCloseButton={false}
-          className="mx-0 mb-0 px-8 pt-5 pb-7 bg-white/66 border-t border-[var(--color-border)] rounded-b-[22px] flex items-center justify-between"
+          className="mx-0 mb-0 px-8 pt-5 pb-7 bg-[var(--surface-panel)] border-t border-[var(--color-border)] rounded-b-[22px] flex items-center justify-between"
         >
           <Button
             type="button"
             variant="ghost"
-            className="text-[#6f726f]"
+            className="text-[var(--color-muted)]"
             onClick={() => {
               setTemplateName("");
               setTemplateDescription("");
@@ -645,7 +647,7 @@ export function CreateTemplateModal({
               setError(null);
             }}
           >
-            Reset Changes
+            {t("wizard.createTemplate.resetChanges")}
           </Button>
           <div className="flex gap-4 items-center pr-2">
             <DialogClose
@@ -658,7 +660,7 @@ export function CreateTemplateModal({
                 />
               }
             >
-              Cancel
+              {t("wizard.createTemplate.cancel")}
             </DialogClose>
             <Button
               type="button"
@@ -668,11 +670,11 @@ export function CreateTemplateModal({
             >
               {saving
                 ? initialTemplate
-                  ? "Updating Template..."
-                  : "Saving Template..."
+                  ? t("wizard.createTemplate.updatingTemplate")
+                  : t("wizard.createTemplate.savingTemplate")
                 : initialTemplate
-                  ? "Update Template"
-                  : "Save Template"}
+                  ? t("wizard.createTemplate.updateTemplate")
+                  : t("wizard.createTemplate.saveTemplate")}
             </Button>
           </div>
         </DialogFooter>

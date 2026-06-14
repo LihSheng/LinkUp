@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -17,7 +18,7 @@ export const { GET } = defineApiRouteHandlers({
 
     if (!schemaTemplate) {
       return NextResponse.json(
-        { error: "Schema template not found." },
+        { error: serverT("api.schemaTemplateNotFound") },
         { status: 404 },
       );
     }

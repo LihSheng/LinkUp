@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import clsx from "clsx";
 
 import { Badge } from "@/components/ui/badge";
@@ -75,6 +76,7 @@ export function MappingReviewTable({
   mappings,
   onChange,
 }: MappingReviewTableProps) {
+  const { t } = useTranslation();
   const [expandedDetails, setExpandedDetails] = useState<Set<string>>(new Set());
   const [showConstantValue, setShowConstantValue] = useState<Set<string>>(new Set());
   const mappingByPath = new Map(mappings.map((mapping) => [mapping.targetPath, mapping]));
@@ -197,8 +199,8 @@ export function MappingReviewTable({
 
   const issueText = (row: (typeof rows)[number]) => {
     const issues: string[] = [];
-    if (row.status === "blocking") issues.push("Required field not mapped");
-    if (row.duplicate) issues.push("Duplicate source");
+    if (row.status === "blocking") issues.push(t("legacy.reviewTable.requiredFieldNotMapped"));
+    if (row.duplicate) issues.push(t("legacy.reviewTable.duplicateSource"));
     if (row.sourceProfile) {
       const mismatch = hasTypeMismatch(row.field.type, row.sourceProfile.detectedType);
       if (mismatch) issues.push(`Source looks ${row.sourceProfile.detectedType}`);
@@ -210,11 +212,11 @@ export function MappingReviewTable({
     <div className="flex h-full min-h-0 flex-col gap-0">
       <div className="flex items-baseline gap-2">
           <span className="text-sm font-semibold text-[var(--color-muted)]">
-            Mapping review
+            {t("legacy.reviewTable.title")}
           </span>
           <span className="text-xs text-[var(--color-ink-40)]">&middot;</span>
           <span className="text-xs text-[var(--color-muted)]">
-          {targetFields.length} fields &middot; {needsReviewCount} need attention
+          {t("legacy.reviewTable.fieldsAttention", { fields: String(targetFields.length), attention: String(needsReviewCount) })}
         </span>
       </div>
 
@@ -223,20 +225,20 @@ export function MappingReviewTable({
           <Table>
             <TableHeader className="sticky top-0 z-10">
               <TableRow className="bg-[var(--color-ink-03)]">
-                <TableHead className="w-[160px] min-w-[120px]">Target Field</TableHead>
-                <TableHead className="w-[70px]">Type</TableHead>
-                <TableHead className="min-w-[180px] w-[220px]">Suggested Source</TableHead>
-                <TableHead className="w-[120px]">Transform</TableHead>
-                <TableHead className="w-[110px]">Confidence</TableHead>
-                <TableHead className="w-auto min-w-[140px]">Issue</TableHead>
-                <TableHead className="w-[120px]">Action</TableHead>
+                <TableHead className="w-[160px] min-w-[120px]">{t("legacy.reviewTable.targetField")}</TableHead>
+                <TableHead className="w-[70px]">{t("legacy.reviewTable.type")}</TableHead>
+                <TableHead className="min-w-[180px] w-[220px]">{t("legacy.reviewTable.suggestedSource")}</TableHead>
+                <TableHead className="w-[120px]">{t("legacy.reviewTable.transform")}</TableHead>
+                <TableHead className="w-[110px]">{t("legacy.reviewTable.confidence")}</TableHead>
+                <TableHead className="w-auto min-w-[140px]">{t("legacy.reviewTable.issue")}</TableHead>
+                <TableHead className="w-[120px]">{t("legacy.reviewTable.action")}</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="h-32 text-center text-sm text-[var(--color-muted)]">
-                    No fields to display.
+                    {t("legacy.reviewTable.noFields")}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -277,10 +279,10 @@ export function MappingReviewTable({
                             }}
                           >
                             <SelectTrigger className="h-8 w-full min-w-[120px] max-w-[200px] rounded-full px-3 text-xs">
-                              <SelectValue placeholder="Select source" />
+                              <SelectValue placeholder={t("legacy.reviewTable.selectSource")} />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value="">Unmapped</SelectItem>
+                              <SelectItem value="">{t("legacy.reviewTable.unmapped")}</SelectItem>
                               {columns.map((column) => (
                                 <SelectItem key={column.name} value={column.name}>
                                   {column.name}
@@ -299,7 +301,7 @@ export function MappingReviewTable({
                                   }));
                                 }}
                                 className="h-8 w-20 min-w-[60px] max-w-[120px] rounded-full border border-[var(--color-border)] bg-[var(--color-cream-soft)] px-3 text-xs transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                                placeholder="Default"
+                                placeholder={t("legacy.reviewTable.default")}
                               />
                               <button
                                 type="button"
@@ -331,7 +333,7 @@ export function MappingReviewTable({
                                 })
                               }
                             >
-                              + Default
+                              + {t("legacy.reviewTable.default")}
                             </button>
                           )}
                         </div>
@@ -387,11 +389,11 @@ export function MappingReviewTable({
                               className="h-7 rounded-full px-3 text-[11px]"
                               onClick={() => acceptMapping(row.field.path)}
                             >
-                              Accept
+                              {t("legacy.reviewTable.accept")}
                             </Button>
                           ) : (
                             <span className="text-[11px] text-[var(--color-success)] font-medium">
-                              Done
+                              {t("legacy.reviewTable.done")}
                             </span>
                           )}
                           <Button
@@ -401,7 +403,7 @@ export function MappingReviewTable({
                             className="h-7 rounded-full px-2.5 text-[11px]"
                             onClick={() => toggleDetails(row.field.path)}
                           >
-                            {expandedDetails.has(row.field.path) ? "Hide" : "Reason"}
+                            {expandedDetails.has(row.field.path) ? t("legacy.reviewTable.hide") : t("legacy.reviewTable.reason")}
                           </Button>
                         </div>
                       </TableCell>
@@ -411,7 +413,7 @@ export function MappingReviewTable({
                         <TableCell colSpan={7} className="bg-[var(--color-ink-03)] p-0">
                           <div className="px-4 py-3">
                             <label className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--color-muted)]">
-                              Manual notes
+                              {t("legacy.reviewTable.manualNotes")}
                             </label>
                             <textarea
                               value={row.mapping.reason ?? ""}
@@ -422,7 +424,7 @@ export function MappingReviewTable({
                                 }));
                               }}
                               className="mt-2 min-h-20 w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-cream-soft)] px-4 py-3 text-sm transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 outline-none"
-                              placeholder="Add notes, rationale, or override comments."
+                              placeholder={t("legacy.reviewTable.addNotesPlaceholder")}
                             />
                           </div>
                         </TableCell>

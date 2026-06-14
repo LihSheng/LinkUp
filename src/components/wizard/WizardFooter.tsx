@@ -13,6 +13,7 @@ type WizardFooterProps = {
   leftSlot?: React.ReactNode;
 };
 
+
 export function WizardFooter({
   statusText,
   statusReady,

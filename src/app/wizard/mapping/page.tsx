@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import useSWR from "swr";
 
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
@@ -11,6 +12,7 @@ import type { ColumnProfile, FieldMapping, TargetField } from "@/lib/mapping/map
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function MappingStepPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("uploadId");
@@ -57,7 +59,7 @@ export default function MappingStepPage() {
   if (runId && isRunLoading) {
     return (
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-        <p className="text-sm text-[var(--color-muted)]">Loading draft...</p>
+        <p className="text-sm text-[var(--color-muted)]">{t("wizard.mapping.loadingDraft")}</p>
       </div>
     );
   }

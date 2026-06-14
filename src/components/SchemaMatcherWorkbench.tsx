@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useState, useTransition } from "react";
+import { useTranslation } from "react-i18next";
 import useSWR from "swr";
 import clsx from "clsx";
 
@@ -347,6 +348,8 @@ export function SchemaMatcherWorkbench() {
   });
   const [toasts, setToasts] = useState<Toast[]>([]);
   const [, startTransition] = useTransition();
+
+  const { t } = useTranslation();
 
   const { data: templatesData, mutate: mutateTemplates } = useSWR("/api/schema-templates", swrFetcher, {
     onError: (error) => {
@@ -884,33 +887,33 @@ export function SchemaMatcherWorkbench() {
       <div className="app-shell">
         <header className="topbar">
           <div>
-            <p className="eyebrow">Linkup schema matcher</p>
+            <p className="eyebrow">{t("legacy.workbench.eyebrow")}</p>
             <div className="topbar-title-row">
-              <h1>Import wizard</h1>
-              <span className="save-pill">{hasUnsavedMappingChanges ? "Unsaved changes" : "All changes saved"}</span>
+              <h1>{t("legacy.workbench.title")}</h1>
+              <span className="save-pill">{hasUnsavedMappingChanges ? t("legacy.workbench.unsavedChanges") : t("legacy.workbench.allChangesSaved")}</span>
             </div>
             <p className="topbar-meta">
-              Home / Schema matcher / {workflowSteps[currentStepIndex]?.title ?? "Schema"}
+              {t("legacy.workbench.homeSchemaMatcher")} / {workflowSteps[currentStepIndex]?.title ?? "Schema"}
             </p>
           </div>
           <div className="topbar-actions">
             <div className="topbar-chip">
               <span className={clsx("connection-dot", aiDegraded ? "offline" : "online")} />
-              {suggestDiagnostics?.provider ?? "AI provider"}
+              {suggestDiagnostics?.provider ?? t("legacy.workbench.aiProvider")}
             </div>
-            <div className="topbar-chip">{activeWorkbookName ?? "No workbook loaded"}</div>
+            <div className="topbar-chip">{activeWorkbookName ?? t("legacy.workbench.noWorkbookLoaded")}</div>
           </div>
         </header>
 
         <div className="shell-body">
           <aside className="sidebar">
             <div className="sidebar-brand">
-              <p className="sidebar-kicker">Workspace</p>
-              <h2>One screen, one job</h2>
-              <p>Each step keeps the next decision visible and the mechanics tucked away.</p>
+              <p className="sidebar-kicker">{t("legacy.workbench.workspace")}</p>
+              <h2>{t("legacy.workbench.sidebarTagline")}</h2>
+              <p>{t("legacy.workbench.sidebarDesc")}</p>
             </div>
 
-            <nav className="step-nav" aria-label="Workflow">
+            <nav className="step-nav" aria-label={t("aria.workflow")}>
               {workflowSteps.map((item) => (
                 <button
                   key={item.key}
@@ -931,10 +934,10 @@ export function SchemaMatcherWorkbench() {
                     </div>
                   </div>
                   <span className={clsx("status-badge", `status-${item.status}`)}>
-                    {item.status === "complete" && "Complete"}
-                    {item.status === "in-progress" && "In progress"}
-                    {item.status === "review" && "Needs review"}
-                    {item.status === "locked" && "Locked"}
+                    {item.status === "complete" && t("legacy.workbench.complete")}
+                    {item.status === "in-progress" && t("legacy.workbench.inProgress")}
+                    {item.status === "review" && t("legacy.workbench.needsReview")}
+                    {item.status === "locked" && t("legacy.workbench.locked")}
                   </span>
                 </button>
               ))}
@@ -942,7 +945,7 @@ export function SchemaMatcherWorkbench() {
 
             <div className="sidebar-modules">
               <ModulePanel
-                title="AI Provider"
+                title={t("legacy.workbench.aiProviderTitle")}
                 open={openModulePanels.ai}
                 onToggle={() =>
                   setOpenModulePanels((current) => ({ ...current, ai: !current.ai }))
@@ -950,69 +953,69 @@ export function SchemaMatcherWorkbench() {
               >
                 {aiDegraded ? (
                   <div className="sidebar-alert">
-                    AI mapping unavailable. Manual mapping mode is active.
+                    {t("legacy.workbench.aiUnavailable")}
                   </div>
                 ) : null}
                 <div className="module-row">
-                  <span>Provider</span>
-                  <span>{suggestDiagnostics?.provider ?? "Ollama / LM Studio"}</span>
+                  <span>{t("legacy.workbench.provider")}</span>
+                  <span>{suggestDiagnostics?.provider ?? t("legacy.workbench.providerDefault")}</span>
                 </div>
                 <div className="module-row">
-                  <span>Model</span>
-                  <span>{suggestDiagnostics?.model ?? "Auto detect"}</span>
+                  <span>{t("legacy.workbench.model")}</span>
+                  <span>{suggestDiagnostics?.model ?? t("legacy.workbench.modelDefault")}</span>
                 </div>
                 <div className="module-row">
-                  <span>Status</span>
+                  <span>{t("legacy.workbench.status")}</span>
                   <span className="module-connection">
                     <span className={clsx("connection-dot", aiDegraded ? "offline" : "online")} />
-                    {aiDegraded ? "Unavailable" : "Connected"}
+                    {aiDegraded ? t("legacy.workbench.unavailable") : t("legacy.workbench.connected")}
                   </span>
                 </div>
                 <div className="module-row">
-                  <span>Timeout</span>
-                  <span>60000 ms</span>
+                  <span>{t("legacy.workbench.timeout")}</span>
+                  <span>{t("legacy.workbench.timeoutValue")}</span>
                 </div>
               </ModulePanel>
 
               <ModulePanel
-                title="Schema Library"
+                title={t("legacy.workbench.schemaLibrary")}
                 open={openModulePanels.schema}
                 onToggle={() =>
                   setOpenModulePanels((current) => ({ ...current, schema: !current.schema }))
                 }
               >
                 <div className="module-row">
-                  <span>Active schema</span>
-                  <span>{activeTemplate?.name ?? "Not selected"}</span>
+                  <span>{t("legacy.workbench.activeSchema")}</span>
+                  <span>{activeTemplate?.name ?? t("legacy.workbench.notSelected")}</span>
                 </div>
                 <div className="module-links">
                   <button type="button" onClick={() => startTransition(() => setActiveView("schema"))}>
-                    Change schema
+                    {t("legacy.workbench.changeSchema")}
                   </button>
                   <button type="button" onClick={() => startTransition(() => setActiveView("schema"))}>
-                    Manage schemas
+                    {t("legacy.workbench.manageSchemas")}
                   </button>
                 </div>
               </ModulePanel>
 
               <ModulePanel
-                title="Import Source"
+                title={t("legacy.workbench.importSource")}
                 open={openModulePanels.source}
                 onToggle={() =>
                   setOpenModulePanels((current) => ({ ...current, source: !current.source }))
                 }
               >
                 <div className="module-row">
-                  <span>File</span>
-                  <span>{activeWorkbookName ?? "None selected"}</span>
+                  <span>{t("legacy.workbench.file")}</span>
+                  <span>{activeWorkbookName ?? t("legacy.workbench.noneSelected")}</span>
                 </div>
                 <div className="module-row">
-                  <span>Sheet</span>
-                  <span>{activeRun?.sourceSheetName ?? "Not loaded"}</span>
+                  <span>{t("legacy.workbench.sheet")}</span>
+                  <span>{activeRun?.sourceSheetName ?? t("legacy.workbench.notLoaded")}</span>
                 </div>
                 <div className="module-links">
                   <button type="button" onClick={() => startTransition(() => setActiveView("workbook"))}>
-                    Replace file
+                    {t("legacy.workbench.replaceFile")}
                   </button>
                 </div>
               </ModulePanel>
@@ -1052,17 +1055,16 @@ export function SchemaMatcherWorkbench() {
               <div className="step-screen">
                 <section className="hero-card">
                   <div>
-                    <p className="eyebrow">Step 2</p>
-                    <h2>Confirm the source workbook looks right</h2>
+                    <p className="eyebrow">{t("legacy.schema.step2")}</p>
+                    <h2>{t("legacy.schema.confirmWorkbook")}</h2>
                     <p className="lede">
-                      No mapping or validation noise here. This screen is only about choosing the
-                      file, sheet, headers, and a quick row preview.
+                      {t("legacy.schema.confirmDesc")}
                     </p>
                   </div>
                   <div className="hero-metrics">
-                    <MetricCard label="Schema" value={activeTemplate?.name ?? "None"} />
-                    <MetricCard label="Rows" value={String(activeRun?.workbookMeta?.rowCount ?? sampleRows.length)} />
-                    <MetricCard label="Columns" value={String(activeRun?.workbookMeta?.columnCount ?? activeColumns.length)} />
+                    <MetricCard label={t("legacy.workbench.activeSchema")} value={activeTemplate?.name ?? t("legacy.schema.none")} />
+                    <MetricCard label={t("legacy.schema.rowsMetric")} value={String(activeRun?.workbookMeta?.rowCount ?? sampleRows.length)} />
+                    <MetricCard label={t("legacy.schema.columnsMetric")} value={String(activeRun?.workbookMeta?.columnCount ?? activeColumns.length)} />
                   </div>
                 </section>
 
@@ -1092,27 +1094,26 @@ export function SchemaMatcherWorkbench() {
                         }
                       }}
                     />
-                    <p className="upload-title">{isUploading ? "Uploading workbook..." : "Drop workbook here or choose a file"}</p>
+                    <p className="upload-title">{isUploading ? t("legacy.schema.uploadingWorkbook") : t("legacy.schema.dropWorkbook")}</p>
                     <p className="upload-copy">
-                      Supports `.xlsx` and `.xls`. We’ll detect likely headers and prepare sample
-                      rows for the mapping step.
+                      {t("legacy.schema.dropDesc")}
                     </p>
                   </label>
 
                   <div className="surface-subcard">
-                    <p className="mini-title">Import settings</p>
+                    <p className="mini-title">{t("legacy.schema.importSettings")}</p>
                     <div className="mini-stack">
                       <div className="module-row">
                         <span>File</span>
-                        <span>{activeWorkbookName ?? "Not uploaded"}</span>
+                        <span>{activeWorkbookName ?? t("legacy.schema.notUploaded")}</span>
                       </div>
                       <div className="module-row">
                         <span>Sheet</span>
-                        <span>{activeRun?.sourceSheetName ?? "Auto detect"}</span>
+                        <span>{activeRun?.sourceSheetName ?? t("legacy.schema.autoDetect")}</span>
                       </div>
                       <div className="module-row">
-                        <span>Header row</span>
-                        <span>Row 1</span>
+                        <span>{t("legacy.schema.headerRow")}</span>
+                        <span>{t("legacy.schema.row1")}</span>
                       </div>
                     </div>
                   </div>
@@ -1123,8 +1124,8 @@ export function SchemaMatcherWorkbench() {
                     <section className="surface-card">
                       <div className="section-head">
                         <div>
-                          <h3>Preview</h3>
-                          <p>Check the first few rows before moving into mapping.</p>
+                          <h3>{t("legacy.schema.preview")}</h3>
+                          <p>{t("legacy.schema.previewDesc")}</p>
                         </div>
                         <div className="section-actions">
                           {(activeRun.workbookMeta?.sheetNames ?? [activeRun.sourceSheetName ?? "Sheet1"]).map((sheet) => (
@@ -1160,11 +1161,10 @@ export function SchemaMatcherWorkbench() {
               <div className="step-screen">
                 <section className="hero-card">
                   <div>
-                    <p className="eyebrow">Step 3</p>
-                    <h2>Map workbook columns to schema fields</h2>
+                    <p className="eyebrow">{t("legacy.mapping.step3")}</p>
+                    <h2>{t("legacy.mapping.mapColumns")}</h2>
                     <p className="lede">
-                      Focus on one row at a time. Duplicates, low confidence suggestions, and
-                      required fields are surfaced inline instead of being buried in a separate report.
+                      {t("legacy.mapping.mapDesc")}
                     </p>
                   </div>
                   <div className="hero-metrics">
@@ -1177,8 +1177,8 @@ export function SchemaMatcherWorkbench() {
                 <section className="surface-card">
                   <div className="section-head">
                     <div>
-                      <h3>Mapping table</h3>
-                      <p>Use AI suggestions when available, then confirm or override them.</p>
+                      <h3>{t("legacy.mapping.mappingTable")}</h3>
+                      <p>{t("legacy.mapping.mappingTableDesc")}</p>
                     </div>
                     <div className="section-actions">
                       <button
@@ -1187,7 +1187,7 @@ export function SchemaMatcherWorkbench() {
                         disabled={isSuggesting || !activeRun}
                         className="secondary-button"
                       >
-                        {isSuggesting ? "Suggesting..." : "Suggest mapping"}
+                        {isSuggesting ? t("legacy.mapping.suggesting") : t("legacy.mapping.suggestMapping")}
                       </button>
                     </div>
                   </div>
@@ -1199,9 +1199,9 @@ export function SchemaMatcherWorkbench() {
                   ) : null}
 
                   <div className="mapping-header-grid">
-                    <span>Source column</span>
-                    <span>Schema field</span>
-                    <span>Status</span>
+                    <span>{t("legacy.mapping.sourceColumn")}</span>
+                    <span>{t("legacy.mapping.schemaField")}</span>
+                    <span>{t("legacy.workbench.status")}</span>
                   </div>
 
                   <div className="mapping-list">
@@ -1216,11 +1216,11 @@ export function SchemaMatcherWorkbench() {
                         <article key={row.field.path} className="mapping-row-card">
                           <div className="mapping-grid">
                             <div className="mapping-source">
-                              <p className="mapping-title">{row.mapping.sourceColumn ?? "Unmapped source"}</p>
+                              <p className="mapping-title">{row.mapping.sourceColumn ?? t("legacy.mapping.unmappedSource")}</p>
                               <p className="mapping-subtle">
                                 {row.samples[0]
                                   ? `Sample: ${row.samples[0]}`
-                                  : "Pick a source column to preview sample values."}
+                                  : t("legacy.mapping.pickSource")}
                               </p>
                             </div>
 
@@ -1243,7 +1243,7 @@ export function SchemaMatcherWorkbench() {
                                   }}
                                   className="field-select"
                                 >
-                                  <option value="">Map manually</option>
+                                  <option value="">{t("legacy.mapping.mapManually")}</option>
                                   {activeColumns.map((column) => (
                                     <option key={column.name} value={column.name}>
                                       {column.name}
@@ -1304,7 +1304,7 @@ export function SchemaMatcherWorkbench() {
                                     )
                                   }
                                 >
-                                  Map manually
+                                  {t("legacy.mapping.mapManually")}
                                 </button>
                               </div>
                             </div>
@@ -1377,17 +1377,16 @@ export function SchemaMatcherWorkbench() {
               <div className="step-screen">
                 <section className="hero-card">
                   <div>
-                    <p className="eyebrow">Step 4</p>
-                    <h2>Review generated records before import</h2>
+                    <p className="eyebrow">{t("legacy.output.step4")}</p>
+                    <h2>{t("legacy.output.reviewRecords")}</h2>
                     <p className="lede">
-                      The default view stays human-readable. Technical validation details are tucked
-                      behind a toggle for developers.
+                      {t("legacy.output.reviewDesc")}
                     </p>
                   </div>
                   <div className="hero-metrics">
-                    <MetricCard label="Records" value={String(Array.isArray(output?.jsonOutput) ? output?.jsonOutput.length : 0)} />
-                    <MetricCard label="Warnings" value={String(validationIssues.filter((issue) => issue.severity === "warning").length)} />
-                    <MetricCard label="Errors" value={String(validationIssues.filter((issue) => issue.severity === "error").length)} />
+                    <MetricCard label={t("legacy.output.recordsMetric")} value={String(Array.isArray(output?.jsonOutput) ? output?.jsonOutput.length : 0)} />
+                    <MetricCard label={t("legacy.output.warningsMetric")} value={String(validationIssues.filter((issue) => issue.severity === "warning").length)} />
+                    <MetricCard label={t("legacy.output.errorsMetric")} value={String(validationIssues.filter((issue) => issue.severity === "error").length)} />
                   </div>
                 </section>
 
@@ -1395,8 +1394,8 @@ export function SchemaMatcherWorkbench() {
                   <div className="surface-card">
                     <div className="section-head">
                       <div>
-                        <h3>Record preview</h3>
-                        <p>Click a record to inspect the transformed JSON for just that row.</p>
+                        <h3>{t("legacy.output.recordPreview")}</h3>
+                        <p>{t("legacy.output.recordPreviewDesc")}</p>
                       </div>
                       <div className="section-actions">
                         <button
@@ -1404,7 +1403,7 @@ export function SchemaMatcherWorkbench() {
                           className="ghost-button"
                           onClick={() => setShowTechnicalDetails((current) => !current)}
                         >
-                          {showTechnicalDetails ? "Hide technical details" : "Show technical details"}
+                          {showTechnicalDetails ? t("legacy.output.hideTechnical") : t("legacy.output.showTechnical")}
                         </button>
                       </div>
                     </div>
@@ -1457,7 +1456,7 @@ export function SchemaMatcherWorkbench() {
                   <div className="surface-card summary-panel">
                     <div className="section-head">
                       <div>
-                        <h3>Summary</h3>
+                        <h3>{t("wizard.output.summary")}</h3>
                         <p>Proceed is allowed with warnings, but not if you still have blocking issues upstream.</p>
                       </div>
                     </div>
@@ -1523,7 +1522,7 @@ export function SchemaMatcherWorkbench() {
               disabled={!previousStep}
               className="ghost-button"
             >
-              Back
+              {t("actions.back")}
             </button>
 
             {activeView === "mapping" ? (
@@ -1548,11 +1547,11 @@ export function SchemaMatcherWorkbench() {
               }
               className="primary-button"
             >
-              {activeView === "schema" && "Next"}
-              {activeView === "workbook" && "Next"}
+              {activeView === "schema" && t("actions.next")}
+              {activeView === "workbook" && t("actions.next")}
               {activeView === "mapping" &&
-                (canGenerate ? (isGenerating ? "Generating..." : "Preview output") : "Save and continue")}
-              {activeView === "output" && "Confirm import"}
+                (canGenerate ? (isGenerating ? "Generating..." : t("wizard.mapping.outputPreview")) : "Save and continue")}
+              {activeView === "output" && t("wizard.output.finish")}
             </button>
           </div>
         </footer>
@@ -1576,6 +1575,8 @@ function SchemaStepView({
   const [schemaError, setSchemaError] = useState<string | null>(null);
   const [schemaSaving, setSchemaSaving] = useState(false);
 
+  const { t } = useTranslation();
+
   const parsedEditorSchema = useMemo(() => {
     try {
       return JSON.parse(editorState.schemaText) as unknown;
@@ -1593,7 +1594,7 @@ function SchemaStepView({
     <div className="step-screen">
       <section className="hero-card">
         <div>
-          <p className="eyebrow">Step 1</p>
+          <p className="eyebrow">{t("wizard.shell.stepPrefix")} 1</p>
           <h2>Choose the schema your records need to match</h2>
           <p className="lede">
             Keep this step focused on the target structure. File handling, mapping, and

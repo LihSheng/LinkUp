@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 import useSWR from "swr";
 
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
@@ -10,6 +11,7 @@ import { MappingCompleteScreen } from "@/components/wizard/MappingCompleteScreen
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 export default function OutputStepPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const runId = searchParams.get("runId");
@@ -46,7 +48,7 @@ export default function OutputStepPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-        <p className="text-sm text-[var(--color-muted)]">Loading completion data...</p>
+        <p className="text-sm text-[var(--color-muted)]">{t("wizard.output.loading")}</p>
       </div>
     );
   }
@@ -55,10 +57,10 @@ export default function OutputStepPage() {
     return (
       <div className="mx-auto flex min-h-0 w-full max-w-[600px] flex-1 flex-col items-center justify-center gap-4 px-1">
         <p className="text-sm text-[var(--color-error)]">
-          {error ? "Failed to load completion data." : "No mapping data found."}
+          {error ? t("wizard.output.loadFailed") : t("wizard.output.noData")}
         </p>
         <button type="button" className="ghost-button" onClick={handleBack}>
-          Back to mapping
+          {t("wizard.output.backToMapping")}
         </button>
       </div>
     );

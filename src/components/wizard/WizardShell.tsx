@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import clsx from "clsx";
 
@@ -21,13 +22,14 @@ import { useWizardProgress } from "./WizardProgressContext";
 import { WizardTopBar } from "./WizardTopBar";
 
 const steps = [
-  { href: "/wizard/schema", label: "Schema", number: "01", title: "Choose a schema", subtitle: "Select data template", description: "Pick the schema that defines how your data should be structured." },
-  { href: "/wizard/workbook", label: "Upload", number: "02", title: "Upload source file", subtitle: "Add your file", description: "Upload your spreadsheet or CSV file to be processed." },
-  { href: "/wizard/mapping", label: "Mapping", number: "03", title: "Map fields", subtitle: "Match columns", description: "AI-powered column mapping — match source columns to schema fields." },
-  { href: "/wizard/output", label: "Done", number: "04", title: "Review & export", subtitle: "Final output", description: "Review the results and export as structured JSON or filled Excel." },
+  { href: "/wizard/schema", key: "schema" },
+  { href: "/wizard/workbook", key: "workbook" },
+  { href: "/wizard/mapping", key: "mapping" },
+  { href: "/wizard/output", key: "output" },
 ] as const;
 
 export function WizardShell({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const pathname = usePathname();
   const router = useRouter();
   const [showBackConfirm, setShowBackConfirm] = useState(false);
@@ -43,7 +45,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
           <span className="wizard-brand-mark">L</span>
           <span>
             <strong>LinkUp</strong>
-            <span>Wizard flow</span>
+            <span>{t("nav.wizardTagline")}</span>
           </span>
         </Link>
 
@@ -51,6 +53,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
           {steps.map((step, index) => {
             const active = pathname === step.href;
             const accessible = isStepAccessible(index);
+            const stepKey = `wizard.shell.steps.${step.key}`;
 
             if (!accessible) {
               return (
@@ -59,10 +62,10 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
                   className={clsx("wizard-step-item", "is-disabled")}
                   aria-disabled="true"
                 >
-                  <span className="wizard-step-number">{step.number}</span>
+                  <span className="wizard-step-number">{t(`${stepKey}.number`)}</span>
                   <span>
-                    <strong>{step.label}</strong>
-                    <span>{step.subtitle}</span>
+                    <strong>{t(`${stepKey}.label`)}</strong>
+                    <span>{t(`${stepKey}.subtitle`)}</span>
                   </span>
                 </span>
               );
@@ -74,10 +77,10 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
                 href={step.href}
                 className={clsx("wizard-step-item", active && "is-active")}
               >
-                <span className="wizard-step-number">{step.number}</span>
+                <span className="wizard-step-number">{t(`${stepKey}.number`)}</span>
                 <span>
-                  <strong>{step.label}</strong>
-                  <span>{step.subtitle}</span>
+                  <strong>{t(`${stepKey}.label`)}</strong>
+                  <span>{t(`${stepKey}.subtitle`)}</span>
                 </span>
               </Link>
             );
@@ -91,11 +94,11 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
               className="ghost-button"
               onClick={() => setShowBackConfirm(true)}
             >
-              Back to dashboard
+              {t("nav.backToDashboard")}
             </button>
           ) : (
             <Link href="/" className="ghost-button">
-              Back to dashboard
+              {t("nav.backToDashboard")}
             </Link>
           )}
         </div>
@@ -104,16 +107,15 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
       <AlertDialog open={showBackConfirm} onOpenChange={setShowBackConfirm}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Leave wizard?</AlertDialogTitle>
+            <AlertDialogTitle>{t("wizard.shell.leave.title")}</AlertDialogTitle>
             <AlertDialogDescription>
-              You have unsaved progress. Going back to the dashboard will discard any changes made
-              in this step.
+              {t("wizard.shell.leave.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Stay</AlertDialogCancel>
+            <AlertDialogCancel>{t("wizard.shell.leave.stay")}</AlertDialogCancel>
             <AlertDialogAction onClick={() => router.push("/")}>
-              Leave
+              {t("wizard.shell.leave.leave")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -122,9 +124,9 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
       <div className="wizard-main-shell">
         {showSharedTopBar ? (
           <WizardTopBar
-            stepNumber={`Step ${activeStep.number}`}
-            title={activeStep.title}
-            description={activeStep.description}
+            stepNumber={`${t("wizard.shell.stepPrefix")} ${t(`wizard.shell.steps.${activeStep.key}.number`)}`}
+            title={t(`wizard.shell.steps.${activeStep.key}.title`)}
+            description={t(`wizard.shell.steps.${activeStep.key}.description`)}
           />
         ) : null}
         <main className="wizard-content">{children}</main>

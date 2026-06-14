@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTranslation } from "react-i18next";
 
 export default function ErrorPage({
   error,
@@ -9,6 +10,7 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   unstable_retry: () => void;
 }) {
+  const { t } = useTranslation();
   const errorCode = error.digest ?? crypto.randomUUID();
   const loggedRef = useRef(false);
 
@@ -64,7 +66,7 @@ export default function ErrorPage({
             margin: "0 0 12px",
           }}
         >
-          Something went wrong
+          {t("errors.page.title")}
         </h1>
 
         <p
@@ -75,8 +77,7 @@ export default function ErrorPage({
             margin: "0 0 24px",
           }}
         >
-          We weren&apos;t able to load this page. Please try again. If the problem
-          persists, contact support with reference code below.
+          {t("errors.page.description")}
         </p>
 
         <button
@@ -97,7 +98,7 @@ export default function ErrorPage({
               "0 0 0 0 rgba(0,0,0,0), inset 0 0.5px 0 rgba(255,255,255,0.2), inset 0 0 0 0.5px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.05)",
           }}
         >
-          Try again
+          {t("errors.page.retry")}
         </button>
 
         <p
@@ -109,7 +110,7 @@ export default function ErrorPage({
             wordBreak: "break-all",
           }}
         >
-          Reference: {errorCode}
+          {t("errors.page.reference", { code: errorCode })}
         </p>
       </div>
     </div>

@@ -13,6 +13,7 @@ import type { SchemaMatchInput } from "@/lib/mapping/mapping.types";
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -24,7 +25,7 @@ export const { POST } = defineApiRouteHandlers({
     const run = await getRunWithRelations(id);
 
     if (!run) {
-      return NextResponse.json({ error: "Run not found." }, { status: 404 });
+      return NextResponse.json({ error: serverT("api.runNotFound") }, { status: 404 });
     }
 
     const provider = getConfiguredAIProvider();

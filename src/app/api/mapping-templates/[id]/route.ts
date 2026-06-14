@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { updateMappingTemplateSchema } from "@/lib/contracts";
 import { prisma } from "@/lib/prisma";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -19,7 +20,7 @@ export const { PATCH } = defineApiRouteHandlers({
 
     if (!existing) {
       return NextResponse.json(
-        { error: "Mapping template not found." },
+        { error: serverT("api.mappingTemplateNotFound") },
         { status: 404 },
       );
     }

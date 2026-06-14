@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 import clsx from "clsx";
 
@@ -53,6 +54,7 @@ function formatSize(bytes: number): string {
 }
 
 export default function WorkbookStepPage() {
+  const { t } = useTranslation();
   const router = useRouter();
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("uploadId");
@@ -126,7 +128,7 @@ export default function WorkbookStepPage() {
         setUploadedFile(null);
         setPreview(null);
         setFileSize(0);
-        setError(err instanceof Error ? err.message : "Unable to restore uploaded file.");
+        setError(err instanceof Error ? err.message : t("errors.restoreFailed"));
         setPageState("error");
         setRestoredUploadId(uploadId);
       } finally {
@@ -148,13 +150,13 @@ export default function WorkbookStepPage() {
       const ext = `.${file.name.split(".").pop()?.toLowerCase()}`;
 
       if (!ALLOWED_TYPES.includes(ext)) {
-        setError("Unsupported file type.");
+        setError(t("wizard.workbook.unsupportedType"));
         setPageState("error");
         return;
       }
 
       if (file.size > MAX_SIZE) {
-        setError("File is too large (max 50 MB).");
+        setError(t("wizard.workbook.fileTooLarge"));
         setPageState("error");
         return;
       }
@@ -338,38 +340,38 @@ export default function WorkbookStepPage() {
                 onClick={() => setActivePanelTab("general")}
                 className={clsx(
                   "rounded-full px-4",
-                  activePanelTab === "general" && "bg-white text-[var(--color-ink)] shadow-sm",
+                  activePanelTab === "general" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
                 )}
-                aria-pressed={activePanelTab === "general"}
-              >
-                General
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setActivePanelTab("data-preview")}
-                className={clsx(
-                  "rounded-full px-4",
-                  activePanelTab === "data-preview" && "bg-white text-[var(--color-ink)] shadow-sm",
-                )}
-                aria-pressed={activePanelTab === "data-preview"}
-              >
-                Data Preview
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant="ghost"
-                onClick={() => setActivePanelTab("profiles")}
-                className={clsx(
-                  "rounded-full px-4",
-                  activePanelTab === "profiles" && "bg-white text-[var(--color-ink)] shadow-sm",
-                )}
-                aria-pressed={activePanelTab === "profiles"}
-              >
-                Column Profiles
-              </Button>
+                  aria-pressed={activePanelTab === "general"}
+                >
+                  {t("wizard.workbook.general")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActivePanelTab("data-preview")}
+                  className={clsx(
+                    "rounded-full px-4",
+                    activePanelTab === "data-preview" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                  )}
+                  aria-pressed={activePanelTab === "data-preview"}
+                >
+                  {t("wizard.workbook.dataPreview")}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setActivePanelTab("profiles")}
+                  className={clsx(
+                    "rounded-full px-4",
+                    activePanelTab === "profiles" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                  )}
+                  aria-pressed={activePanelTab === "profiles"}
+                >
+                  {t("wizard.workbook.columnProfiles")}
+                </Button>
             </div>
 
             {activePanelTab === "general" ? (
@@ -385,16 +387,16 @@ export default function WorkbookStepPage() {
                 >
                   <div style={{ minWidth: 0 }}>
                     <strong>{uploadedFile.originalName}</strong>
-                    <p>{formatSize(fileSize)} &middot; Ready</p>
+                    <p>{formatSize(fileSize)} &middot; {t("wizard.workbook.ready")}</p>
                   </div>
                   <button
                     type="button"
                     className="ghost-button"
                     onClick={handleRemove}
                     style={{ color: "var(--color-error)", whiteSpace: "nowrap" }}
-                    aria-label={`Remove ${uploadedFile.originalName}`}
+                    aria-label={t("wizard.workbook.removeLabel", { name: uploadedFile.originalName })}
                   >
-                    Remove file
+                    {t("wizard.workbook.removeFile")}
                   </button>
                 </div>
 
@@ -402,7 +404,7 @@ export default function WorkbookStepPage() {
                   <>
                     <div>
                       <p className="dashboard-card-kicker" style={{ marginBottom: "8px" }}>
-                        Workbook context
+                        {t("wizard.workbook.workbookContext")}
                       </p>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {preview.sheetNames.map((name) => (
@@ -433,19 +435,19 @@ export default function WorkbookStepPage() {
                       <div className="metric-card">
                         <p className="text-3xl font-bold">{preview.sheetNames.length}</p>
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-3">
-                          Sheets
+                          {t("wizard.workbook.sheets")}
                         </p>
                       </div>
                       <div className="metric-card">
                         <p className="text-3xl font-bold">{preview.sampleRows.length}</p>
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-3">
-                          Samples
+                          {t("wizard.workbook.samples")}
                         </p>
                       </div>
                       <div className="metric-card">
                         <p className="text-3xl font-bold">{preview.headers.length}</p>
                         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-3">
-                          Columns
+                          {t("wizard.workbook.columns")}
                         </p>
                       </div>
                     </div>
@@ -456,7 +458,7 @@ export default function WorkbookStepPage() {
               <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="text-sm text-muted-foreground">
-                    Header row detected at row {preview ? preview.headerRowIndex + 1 : "-"}.
+                    {t("wizard.workbook.headerRowDetected", { row: String(preview ? preview.headerRowIndex + 1 : "-") })}
                   </div>
                   {preview && preview.sampleRows.length > visibleSampleRowCount ? (
                     <Button
@@ -469,7 +471,7 @@ export default function WorkbookStepPage() {
                         )
                       }
                     >
-                      Show more rows
+                      {t("wizard.workbook.showMoreRows")}
                     </Button>
                   ) : null}
                 </div>
@@ -517,7 +519,7 @@ export default function WorkbookStepPage() {
             ) : (
               <div className="min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto">
                 <div className="text-sm text-muted-foreground">
-                  {columnProfiles.length} column profiles generated from the detected header row.
+                  {t("wizard.workbook.columnProfilesGenerated", { count: String(columnProfiles.length) })}
                 </div>
                 {columnProfiles.length > 0 ? (
                   <div
@@ -557,7 +559,7 @@ export default function WorkbookStepPage() {
             onKeyDown={handleKeyDown}
             role="button"
             tabIndex={0}
-            aria-label={`Upload your file — drag and drop or click to browse. Accepted: ${ALLOWED_LABEL}, max 50 MB`}
+            aria-label={t("wizard.workbook.uploadLabel", { types: ALLOWED_LABEL })}
             aria-disabled={showBusyState}
             style={{
               cursor: showBusyState ? "default" : "pointer",
@@ -578,35 +580,35 @@ export default function WorkbookStepPage() {
 
             {isRestoring ? (
               <>
-                <p className="upload-title">Restoring previous upload&hellip;</p>
+                <p className="upload-title">{t("wizard.workbook.restoring")}</p>
                 <p style={{ color: "var(--color-muted)", fontSize: "0.9rem" }}>
-                  Loading workbook details
+                  {t("wizard.workbook.loadingWorkbook")}
                 </p>
               </>
             ) : pageState === "uploading" ? (
               <>
-                <p className="upload-title">Uploading&hellip;</p>
+                <p className="upload-title">{t("wizard.workbook.uploading")}</p>
                 <p style={{ color: "var(--color-muted)", fontSize: "0.9rem" }}>
-                  Processing your file
+                  {t("wizard.workbook.processing")}
                 </p>
               </>
             ) : pageState === "error" ? (
               <>
                 <p className="upload-title" style={{ color: "var(--color-error)" }}>
-                  Upload failed
+                  {t("wizard.workbook.uploadFailed")}
                 </p>
                 <p style={{ color: "var(--color-error)", fontSize: "0.9rem" }}>
-                  {error ?? "An error occurred."}
+                  {error ?? t("wizard.workbook.errorOccurred")}
                 </p>
                 <p style={{ color: "var(--color-muted)", fontSize: "0.85rem", marginTop: "4px" }}>
-                  Click or drag a file to try again
+                  {t("wizard.workbook.clickOrDrag")}
                 </p>
               </>
             ) : (
               <>
-                <p className="upload-title">Drag &amp; drop your file here</p>
+                <p className="upload-title">{t("wizard.workbook.dragDrop")}</p>
                 <p style={{ color: "var(--color-muted)", fontSize: "0.9rem" }}>
-                  or click to browse &middot; {ALLOWED_LABEL} (max 50 MB)
+                  {t("wizard.workbook.orClickToBrowse", { types: ALLOWED_LABEL })}
                 </p>
               </>
             )}
@@ -617,18 +619,18 @@ export default function WorkbookStepPage() {
       <WizardFooter
         statusText={
           isRestoring
-            ? "Restoring previous upload"
+            ? t("wizard.workbook.statusRestoring")
             : pageState === "success"
-              ? "Ready to continue"
+              ? t("wizard.workbook.statusReady")
               : pageState === "error"
-                ? error ?? "Upload failed"
-                : "Upload your file to continue"
+                ? error ?? t("wizard.workbook.uploadError")
+                : t("wizard.workbook.statusUpload")
         }
         statusReady={pageState === "success"}
         onPrimary={handleContinue}
-        primaryLabel="Next"
+        primaryLabel={t("wizard.workbook.next")}
         primaryDisabled={!uploadedFile || showBusyState}
-        secondaryLabel="Back"
+        secondaryLabel={t("wizard.workbook.back")}
         onSecondary={() => {
           const params = new URLSearchParams();
           if (templateId) params.set("templateId", templateId);

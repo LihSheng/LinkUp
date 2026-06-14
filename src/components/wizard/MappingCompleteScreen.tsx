@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Check, AlertTriangle, Download, FileSpreadsheet, ChevronDown, ChevronUp } from "lucide-react";
 import * as XLSX from "xlsx";
 
@@ -109,6 +110,7 @@ export function MappingCompleteScreen({
   onFinish,
   mappingTemplateId,
 }: MappingCompleteScreenProps) {
+  const { t } = useTranslation();
   const output = runData.output;
   const metrics = output ? getMetrics(output) : { rows: 0, errorCount: 0, valid: true, rowsWithErrors: new Set<number>(), validationRate: 100 };
   const errors = output ? getErrorList(output) : [];
@@ -144,16 +146,16 @@ export function MappingCompleteScreen({
 
       if (!res.ok) {
         const data = await res.json();
-        throw new Error((data as { error?: string }).error ?? "Failed to update favorite.");
+        throw new Error((data as { error?: string }).error ?? t("wizard.output.favUpdateFailed"));
       }
 
       setIsFavorite(nextValue);
-    } catch (err) {
+    } catch {
       // ignore toggle failures silently
     } finally {
       setIsTogglingFavorite(false);
     }
-  }, [mappingTemplateId, isFavorite]);
+  }, [mappingTemplateId, isFavorite, t]);
 
   const jsonPreview =
     output?.jsonOutput && Array.isArray(output.jsonOutput)
@@ -183,12 +185,12 @@ export function MappingCompleteScreen({
               </div>
               <div>
                 <h3 className="text-lg font-semibold text-[var(--color-ink)]">
-                  {metrics.valid ? "Mapping complete" : "Completed with warnings"}
+                  {metrics.valid ? t("wizard.output.statusComplete") : t("wizard.output.statusWarnings")}
                 </h3>
                 <p className="mt-0.5 text-sm text-[var(--color-muted)]">
                   {metrics.valid
-                    ? `All ${metrics.rows} record${metrics.rows !== 1 ? "s" : ""} validated successfully against ${runData.schemaTemplate?.name ?? "the schema"}.`
-                    : `${metrics.errorCount} validation issue${metrics.errorCount !== 1 ? "s" : ""} found across ${metrics.rows} row${metrics.rows !== 1 ? "s" : ""}.`}
+                    ? t(metrics.rows === 1 ? "wizard.output.recordsValidated" : "wizard.output.recordsValidatedPlural", { count: String(metrics.rows), schema: runData.schemaTemplate?.name ?? t("wizard.output.schemaFallback") })
+                    : t(metrics.errorCount === 1 ? "wizard.output.issuesFound" : "wizard.output.issuesFoundPlural", { count: String(metrics.errorCount), rowCount: String(metrics.rows) })}
                 </p>
               </div>
             </div>
@@ -199,10 +201,10 @@ export function MappingCompleteScreen({
             <div className="flex items-center justify-between border-b border-[var(--color-border)] px-6 py-4">
               <div>
                 <h4 className="text-sm font-semibold text-[var(--color-ink)]">
-                  Output preview
+                  {t("wizard.output.outputPreview")}
                 </h4>
                 <p className="text-xs text-[var(--color-muted)]">
-                  Read-only view of the finalized mapped data
+                  {t("wizard.output.outputPreviewDesc")}
                 </p>
               </div>
               <div className="flex items-center gap-2">
@@ -213,7 +215,7 @@ export function MappingCompleteScreen({
                   disabled={!output?.jsonOutput}
                 >
                   <Download className="mr-1.5 h-3.5 w-3.5" />
-                  JSON
+                  {t("wizard.output.exportJson")}
                 </Button>
                 <Button
                   variant="outline"
@@ -222,7 +224,7 @@ export function MappingCompleteScreen({
                   disabled={!output?.jsonOutput}
                 >
                   <FileSpreadsheet className="mr-1.5 h-3.5 w-3.5" />
-                  Excel
+                  {t("wizard.output.exportExcel")}
                 </Button>
               </div>
             </div>
@@ -244,7 +246,7 @@ export function MappingCompleteScreen({
                 <div className="flex items-center gap-2">
                   <AlertTriangle className="h-4 w-4 text-[var(--color-warning)]" />
                   <span className="text-sm font-semibold text-[var(--color-ink)]">
-                    {errors.length} validation issue{errors.length !== 1 ? "s" : ""}
+                    {t(errors.length === 1 ? "wizard.output.validationIssue" : "wizard.output.validationIssues", { count: String(errors.length) })}
                   </span>
                 </div>
                 {showErrors ? (
@@ -265,7 +267,7 @@ export function MappingCompleteScreen({
                             </span>
                             <div className="min-w-0">
                               <p className="text-[0.75rem] text-[var(--color-ink)]">
-                                {err.message ?? err.keyword}
+                                {err.message ?? t("errors.validation")}
                               </p>
                               <p className="mt-0.5 text-[0.65rem] text-[var(--color-muted)]">
                                 {err.instancePath || "/"}
@@ -287,32 +289,32 @@ export function MappingCompleteScreen({
           {/* Summary metrics */}
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-5">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Summary
+              {t("wizard.output.summary")}
             </span>
             <div>
               <div className="text-2xl font-semibold text-[var(--color-ink)]">
                 {metrics.rows.toLocaleString()}
               </div>
-              <div className="mt-0.5 text-xs text-[var(--color-muted)]">Rows processed</div>
+              <div className="mt-0.5 text-xs text-[var(--color-muted)]">{t("wizard.output.rowsProcessed")}</div>
             </div>
             <div>
               <div className={`text-2xl font-semibold ${metrics.valid ? "text-[var(--color-success)]" : "text-[var(--color-warning)]"}`}>
                 {metrics.validationRate}%
               </div>
-              <div className="mt-0.5 text-xs text-[var(--color-muted)]">Validation rate</div>
+              <div className="mt-0.5 text-xs text-[var(--color-muted)]">{t("wizard.output.validationRate")}</div>
             </div>
             <div>
               <div className={`text-2xl font-semibold ${metrics.errorCount > 0 ? "text-[var(--color-warning)]" : "text-[var(--color-ink)]"}`}>
                 {metrics.errorCount}
               </div>
-              <div className="mt-0.5 text-xs text-[var(--color-muted)]">{metrics.errorCount === 1 ? "Error" : "Errors"}</div>
+              <div className="mt-0.5 text-xs text-[var(--color-muted)]">{metrics.errorCount === 1 ? t("wizard.output.error") : t("wizard.output.errors")}</div>
             </div>
           </div>
 
           {/* Export actions */}
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-5">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Export
+              {t("wizard.output.export")}
             </span>
             <Button
               variant="outline"
@@ -321,7 +323,7 @@ export function MappingCompleteScreen({
               disabled={!output?.jsonOutput}
             >
               <Download className="mr-2 h-4 w-4" />
-              Download JSON
+              {t("wizard.output.downloadJson")}
             </Button>
             <Button
               variant="outline"
@@ -330,33 +332,33 @@ export function MappingCompleteScreen({
               disabled={!output?.jsonOutput}
             >
               <FileSpreadsheet className="mr-2 h-4 w-4" />
-              Download Excel
+              {t("wizard.output.downloadExcel")}
             </Button>
           </div>
 
           {/* File info */}
           <div className="flex flex-col gap-2 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-5">
             <span className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--color-muted)]">
-              Details
+              {t("wizard.output.details")}
             </span>
             <div>
-              <div className="text-xs text-[var(--color-muted)]">Source file</div>
+              <div className="text-xs text-[var(--color-muted)]">{t("wizard.output.sourceFile")}</div>
               <div className="text-sm text-[var(--color-ink)] truncate">{fileName}</div>
             </div>
             <div>
-              <div className="text-xs text-[var(--color-muted)]">Schema</div>
-              <div className="text-sm text-[var(--color-ink)]">{runData.schemaTemplate?.name ?? "—"}</div>
+              <div className="text-xs text-[var(--color-muted)]">{t("wizard.output.schema")}</div>
+              <div className="text-sm text-[var(--color-ink)]">{runData.schemaTemplate?.name ?? "\u2014"}</div>
             </div>
           </div>
         </div>
       </div>
 
       <WizardFooter
-        statusText={metrics.valid ? "Mapping finalized" : "Completed with warnings"}
+        statusText={metrics.valid ? t("wizard.output.statusFinalized") : t("wizard.output.statusWarnings")}
         statusReady={true}
-        primaryLabel="Finish"
+        primaryLabel={t("wizard.output.finish")}
         onPrimary={onFinish}
-        secondaryLabel="Back to mapping"
+        secondaryLabel={t("wizard.output.backToMapping")}
         onSecondary={onBack}
         leftSlot={
           mappingTemplateId ? (
@@ -365,7 +367,7 @@ export function MappingCompleteScreen({
               className="relative group flex items-center justify-center size-10 rounded-full border border-[var(--color-border)] bg-transparent cursor-pointer hover:bg-[rgba(28,28,28,0.04)] disabled:opacity-50"
               onClick={handleToggleFavorite}
               disabled={isTogglingFavorite}
-              aria-label={isFavorite ? "Remove from favorites" : "Mark as favorite for future reuse"}
+              aria-label={isFavorite ? t("wizard.output.favRemove") : t("wizard.output.favMark")}
             >
               <svg
                 viewBox="0 0 24 24"
@@ -378,8 +380,8 @@ export function MappingCompleteScreen({
               >
                 <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
               </svg>
-              <span className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--color-ink)] text-white text-xs px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
-                {isFavorite ? "Remove from favorites" : "Mark as favorite for future reuse"}
+              <span className="absolute -top-9 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-lg bg-[var(--color-ink)] text-[var(--color-on-ink)] text-xs px-3 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                {isFavorite ? t("wizard.output.favRemove") : t("wizard.output.favMark")}
               </span>
             </button>
           ) : null

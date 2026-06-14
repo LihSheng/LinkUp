@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -63,10 +64,11 @@ function summariseSchema(schema: unknown) {
 }
 
 export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorProps) {
-  const [name, setName] = useState(activeTemplate?.name ?? "Employee import schema");
+  const { t } = useTranslation();
+  const [name, setName] = useState(activeTemplate?.name ?? t("legacy.editor.defaultName"));
   const [description, setDescription] = useState(
     activeTemplate?.description ??
-      "Initial employee onboarding schema for Excel uploads.",
+      t("legacy.editor.defaultDescription"),
   );
   const [schemaText, setSchemaText] = useState(
     activeTemplate ? JSON.stringify(activeTemplate.jsonSchema, null, 2) : starterSchema,
@@ -89,17 +91,16 @@ export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorP
     <Card className="rounded-[2rem] p-6 gap-0">
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4 p-0">
         <div>
-          <Badge variant="outline" className="rounded-full">Schema setup</Badge>
-          <h2 className="mt-3 text-2xl font-semibold">Define the target JSON shape</h2>
+          <Badge variant="outline" className="rounded-full">{t("legacy.editor.badge")}</Badge>
+          <h2 className="mt-3 text-2xl font-semibold">{t("legacy.editor.title")}</h2>
           <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-            Pick a saved template from the sidebar or edit the schema here. The summary
-            stays compact until you need to inspect the raw JSON.
+            {t("legacy.editor.description")}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 text-xs">
-          <Badge variant="secondary">Required: {summary.required}</Badge>
-          <Badge variant="secondary">Top-level fields: {summary.properties}</Badge>
-          <Badge variant="secondary">Nested groups: {summary.nested}</Badge>
+          <Badge variant="secondary">{t("legacy.editor.required")}: {summary.required}</Badge>
+          <Badge variant="secondary">{t("legacy.editor.topLevelFields")}: {summary.properties}</Badge>
+          <Badge variant="secondary">{t("legacy.editor.nestedGroups")}: {summary.nested}</Badge>
         </div>
       </CardHeader>
 
@@ -109,20 +110,20 @@ export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorP
             <Input
               value={name}
               onChange={(event) => setName(event.target.value)}
-              placeholder="Schema template name"
+              placeholder={t("legacy.editor.namePlaceholder")}
               className="h-auto rounded-2xl px-4 py-3"
             />
             <Input
               value={description}
               onChange={(event) => setDescription(event.target.value)}
-              placeholder="Short description"
+              placeholder={t("legacy.editor.descriptionPlaceholder")}
               className="h-auto rounded-2xl px-4 py-3"
             />
           </div>
           <div className="rounded-[1.5rem] border border-border bg-card/70 p-4 text-sm text-muted-foreground">
-            <p className="font-semibold text-foreground">Validation status</p>
+            <p className="font-semibold text-foreground">{t("legacy.editor.validationStatus")}</p>
             <p className="mt-2">
-              {parsedSchema ? "Schema JSON is valid and ready to save." : "Schema JSON needs fixing before save."}
+              {parsedSchema ? t("legacy.editor.validAndReady") : t("legacy.editor.needsFixing")}
             </p>
           </div>
         </div>
@@ -130,9 +131,9 @@ export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorP
         <div className="mt-5 rounded-[1.5rem] border border-border bg-card/70 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-sm font-semibold">Schema summary</p>
+              <p className="text-sm font-semibold">{t("legacy.editor.schemaSummary")}</p>
               <p className="mt-1 text-sm text-muted-foreground">
-                {activeTemplate ? `Editing from template "${activeTemplate.name}".` : "Start from the sample employee schema and save a reusable template."}
+                {activeTemplate ? t("legacy.editor.editingFrom", { name: activeTemplate.name }) : t("legacy.editor.startFromSample")}
               </p>
             </div>
             <Button
@@ -140,7 +141,7 @@ export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorP
               variant="outline"
               onClick={() => setShowEditor((current) => !current)}
             >
-              {showEditor ? "Hide schema JSON" : "Edit schema JSON"}
+              {showEditor ? t("legacy.editor.hideSchemaJson") : t("legacy.editor.editSchemaJson")}
             </Button>
           </div>
           {showEditor ? (
@@ -170,14 +171,14 @@ export function SchemaEditor({ activeTemplate, onCreateTemplate }: SchemaEditorP
                 setError(
                   caughtError instanceof Error
                     ? caughtError.message
-                    : "Unable to create schema template.",
+                    : t("legacy.editor.unableToCreate"),
                 );
               } finally {
                 setSaving(false);
               }
             }}
           >
-            {saving ? "Saving schema..." : "Save schema template"}
+            {saving ? t("legacy.editor.saving") : t("legacy.editor.saveTemplate")}
           </Button>
         </div>
       </CardContent>

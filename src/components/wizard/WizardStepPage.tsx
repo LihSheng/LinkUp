@@ -1,3 +1,6 @@
+"use client";
+
+import { useTranslation } from "react-i18next";
 import { WizardFooter } from "./WizardFooter";
 
 type WizardStepPageProps = {
@@ -22,13 +25,15 @@ export function WizardStepPage({
   note,
   statusText,
   statusReady,
-  primaryLabel = "Next",
-  secondaryLabel = "Back",
+  primaryLabel,
+  secondaryLabel,
   stats,
   children,
   onContinue,
   onBack,
 }: WizardStepPageProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="wizard-step-page">
       <section className="wizard-hero">
@@ -50,7 +55,7 @@ export function WizardStepPage({
 
       <section className="wizard-panel">
         <div className="wizard-panel-copy">
-          <p className="dashboard-card-kicker">Skeleton note</p>
+          <p className="dashboard-card-kicker">{t("wizard.stepPage.skeletonNote")}</p>
           <p>{note}</p>
         </div>
 
@@ -60,9 +65,9 @@ export function WizardStepPage({
       <WizardFooter
         statusText={statusText}
         statusReady={statusReady}
-        primaryLabel={primaryLabel}
+        primaryLabel={primaryLabel ?? t("wizard.stepPage.defaultPrimary")}
         onPrimary={onContinue}
-        secondaryLabel={secondaryLabel}
+        secondaryLabel={secondaryLabel ?? t("wizard.stepPage.defaultSecondary")}
         onSecondary={onBack}
       />
     </div>

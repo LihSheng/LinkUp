@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
+import { useTranslation } from "react-i18next";
 
 import { Sparkles, Check, AlertTriangle, X, Eye, Circle, RotateCcw } from "lucide-react";
 import clsx from "clsx";
@@ -120,14 +121,16 @@ function jsonPreviewFromMappings(mappings: FieldMapping[]): string {
   return JSON.stringify(obj, null, 2);
 }
 
-const DEFAULT_ACTIVITY_STEPS: ActivityStep[] = [
-  { id: 0, label: "Preparing your file...", status: "pending", elapsed: null },
-  { id: 1, label: "Reading uploaded columns...", status: "pending", elapsed: null },
-  { id: 2, label: "Finding matching fields...", status: "pending", elapsed: null },
-  { id: 3, label: "Checking mapping results...", status: "pending", elapsed: null },
-  { id: 4, label: "Mapping complete", status: "pending", elapsed: null },
-  { id: 5, label: "Preparing review summary...", status: "pending", elapsed: null },
-];
+function getDefaultActivitySteps(t: (key: string) => string): ActivityStep[] {
+  return [
+    { id: 0, label: t("wizard.mapping.activityPreparing"), status: "pending", elapsed: null },
+    { id: 1, label: t("wizard.mapping.activityReading"), status: "pending", elapsed: null },
+    { id: 2, label: t("wizard.mapping.activityFinding"), status: "pending", elapsed: null },
+    { id: 3, label: t("wizard.mapping.activityChecking"), status: "pending", elapsed: null },
+    { id: 4, label: t("wizard.mapping.activityComplete"), status: "pending", elapsed: null },
+    { id: 5, label: t("wizard.mapping.activityPreparingReview"), status: "pending", elapsed: null },
+  ];
+}
 
 export function MappingWorkbench({
   onBack,
@@ -137,6 +140,7 @@ export function MappingWorkbench({
   initialColumnProfiles,
   initialMappings,
 }: MappingWorkbenchProps) {
+  const { t } = useTranslation();
   const searchParams = useSearchParams();
   const uploadId = searchParams.get("uploadId");
   const sheet = searchParams.get("sheet");
@@ -153,7 +157,7 @@ export function MappingWorkbench({
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>(initialColumnProfiles ?? []);
   const [mappings, setMappings] = useState<FieldMapping[]>(initialMappings ?? []);
 
-  const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(DEFAULT_ACTIVITY_STEPS);
+  const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(getDefaultActivitySteps(t));
   const [completedStepIds, setCompletedStepIds] = useState<Set<number>>(new Set());
   const [showSoftMessage, setShowSoftMessage] = useState(false);
   const [showManualButton, setShowManualButton] = useState(false);
@@ -415,8 +419,8 @@ export function MappingWorkbench({
     );
     if (unmappedRequired.length > 0) {
       const names = unmappedRequired.map((f) => f.path).join(", ");
-      toast.error("Required fields unmapped", {
-        description: `${unmappedRequired.length} required field${unmappedRequired.length > 1 ? "s" : ""} still need a source column: ${names}`,
+      toast.error(t("wizard.mapping.requiredUnmapped"), {
+        description: t(unmappedRequired.length === 1 ? "wizard.mapping.requiredUnmappedDesc" : "wizard.mapping.requiredUnmappedDescPlural", { count: String(unmappedRequired.length), names }),
       });
       return;
     }
@@ -446,12 +450,12 @@ export function MappingWorkbench({
         throw new Error(outputData.error ?? "Output generation failed.");
       }
 
-      toast.success("Output ready", { description: "Your mapped data is ready to export." });
+      toast.success(t("wizard.mapping.toastOutputReady"), { description: t("wizard.mapping.toastOutputReadyDesc") });
       onComplete?.(runId, confirmData.mappingTemplateId);
     } catch (err) {
       setPhase("review");
-      const msg = err instanceof Error ? err.message : "Confirmation failed.";
-      toast.error("Confirmation failed", { description: msg });
+      const msg = err instanceof Error ? err.message : t("wizard.mapping.toastConfirmFailed");
+      toast.error(t("wizard.mapping.toastConfirmFailed"), { description: msg });
     }
   }, [runId, mappings, targetFields, onComplete]);
 
@@ -463,7 +467,7 @@ export function MappingWorkbench({
 
     processStartTimeRef.current = Date.now();
     setPhase("analyzing");
-    setActivitySteps(DEFAULT_ACTIVITY_STEPS.map((s) => ({ ...s, status: "pending" as StepStatus, elapsed: null })));
+    setActivitySteps(getDefaultActivitySteps(t).map((s) => ({ ...s, status: "pending" as StepStatus, elapsed: null })));
     setCompletedStepIds(new Set());
     stepStartTimes.current.clear();
 
@@ -498,13 +502,13 @@ export function MappingWorkbench({
       updateStepStatus(5, "done");
 
       setPhase("review");
-      toast.success("Auto-mapping complete", {
-        description: "AI suggestions have been refreshed.",
+      toast.success(t("wizard.mapping.toastAutoMappingComplete"), {
+        description: t("wizard.mapping.toastAutoMappingDesc"),
       });
     } catch (err) {
       setPhase("review");
-      toast.error("Auto-mapping failed", {
-        description: err instanceof Error ? err.message : "Could not refresh suggestions.",
+      toast.error(t("wizard.mapping.toastAutoMappingFailed"), {
+        description: err instanceof Error ? err.message : t("wizard.mapping.toastAutoMapErrorDesc"),
       });
     }
   }, [runId, updateStepStatus]);
@@ -529,10 +533,10 @@ export function MappingWorkbench({
         <div className="flex flex-col overflow-hidden rounded-xl bg-transparent">
           <div className="flex flex-col items-center px-10 pb-6 pt-10 text-center">
             <h3 className="m-0 font-[var(--font-display)] text-[clamp(2.2rem,3.6vw,3.2rem)] font-semibold tracking-[-0.07rem] text-[var(--color-ink)]">
-              Schema Mapping in Progress
+              {t("wizard.mapping.workbenchTitle")}
             </h3>
             <p className="m-0 mt-4 max-w-[42ch] text-[1rem] leading-relaxed text-[var(--color-muted)]">
-              We&apos;re matching your uploaded columns to the target schema. Review and adjust the results once mapping is complete.
+              {t("wizard.mapping.workbenchDesc")}
             </p>
           </div>
 
@@ -575,7 +579,7 @@ export function MappingWorkbench({
 
           {showSoftMessage && (
             <p className="text-sm text-[var(--color-muted)] text-center mt-4">
-              Still matching your columns. Larger or more complex files may take longer.
+              {t("wizard.mapping.stillMatching")}
             </p>
           )}
 
@@ -584,19 +588,19 @@ export function MappingWorkbench({
               <Dialog open={manualConfirmOpen} onOpenChange={setManualConfirmOpen}>
                 <DialogTrigger render={
                   <Button variant="outline" size="sm">
-                    Continue manually
+                    {t("wizard.mapping.continueManually")}
                   </Button>
                 } />
                 <DialogContent className="max-w-md">
                   <DialogHeader>
-                    <DialogTitle>Continue with manual mapping?</DialogTitle>
+                    <DialogTitle>{t("wizard.mapping.manualMappingTitle")}</DialogTitle>
                   </DialogHeader>
                   <p className="text-sm text-[var(--color-muted)]">
-                    Automatic mapping is still running. If you continue manually, any incomplete suggestions will be discarded and you can map each column yourself.
+                    {t("wizard.mapping.manualMappingDesc")}
                   </p>
                   <div className="mt-4 flex justify-end gap-3">
                     <Button variant="outline" size="sm" onClick={() => setManualConfirmOpen(false)}>
-                      Keep waiting
+                      {t("wizard.mapping.keepWaiting")}
                     </Button>
                     <Button
                       size="sm"
@@ -617,7 +621,7 @@ export function MappingWorkbench({
                         setPhase("review");
                       }}
                     >
-                      Continue manually
+                      {t("wizard.mapping.continueManually")}
                     </Button>
                   </div>
                 </DialogContent>
@@ -636,15 +640,15 @@ export function MappingWorkbench({
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(176,0,32,0.08)]">
             <X className="h-8 w-8 text-[var(--color-error)]" />
           </div>
-          <h3 className="text-xl font-semibold text-[var(--color-ink)]">Mapping setup failed</h3>
+          <h3 className="text-xl font-semibold text-[var(--color-ink)]">{t("wizard.mapping.setupFailed")}</h3>
           <p className="mt-2 text-sm text-[var(--color-muted)]">{errorMessage}</p>
         </div>
 
         {missingFieldsInfo ? (
           <div className="w-full rounded-xl border border-[rgba(176,0,32,0.15)] bg-[rgba(176,0,32,0.04)] p-5">
-            <h4 className="text-sm font-semibold text-[var(--color-error)]">Missing required fields</h4>
+            <h4 className="text-sm font-semibold text-[var(--color-error)]">{t("wizard.mapping.missingFields")}</h4>
             <p className="mt-1 text-xs text-[var(--color-muted)]">
-              These fields are required by the schema but were not found in your workbook. Add columns matching these names and re-upload.
+              {t("wizard.mapping.missingFieldsDesc")}
             </p>
             <div className="mt-3 flex flex-wrap gap-2">
               {missingFieldsInfo.missingRequiredFields.map((field) => (
@@ -659,13 +663,12 @@ export function MappingWorkbench({
             {missingFieldsInfo.detection.confidence > 0 ? (
               <div className="mt-4 border-t border-[rgba(176,0,32,0.1)] pt-3">
                 <p className="text-xs text-[var(--color-muted)]">
-                  Header detection confidence: {Math.round(missingFieldsInfo.detection.confidence * 100)}%
-                  {missingFieldsInfo.detection.ambiguous ? " (ambiguous)" : ""}
-                  &nbsp;&middot; Header row: {missingFieldsInfo.detection.headerRowIndex + 1}
+                  {t("wizard.mapping.headerDetection", { confidence: String(Math.round(missingFieldsInfo.detection.confidence * 100)), ambiguous: missingFieldsInfo.detection.ambiguous ? t("wizard.mapping.ambiguous") : "" })}
+                  &nbsp;&middot; {t("wizard.mapping.headerRow", { row: String(missingFieldsInfo.detection.headerRowIndex + 1) })}
                 </p>
                 {missingFieldsInfo.detection.matchedFields.length > 0 ? (
                   <p className="mt-1 text-xs text-[var(--color-muted)]">
-                    {missingFieldsInfo.detection.matchedFields.length} field{missingFieldsInfo.detection.matchedFields.length > 1 ? "s" : ""} matched: {missingFieldsInfo.detection.matchedFields.map((f) => f.headerName).join(", ")}
+                    {t(missingFieldsInfo.detection.matchedFields.length === 1 ? "wizard.mapping.fieldsMatched" : "wizard.mapping.fieldsMatchedPlural", { count: String(missingFieldsInfo.detection.matchedFields.length), names: missingFieldsInfo.detection.matchedFields.map((f) => f.headerName).join(", ") })}
                   </p>
                 ) : null}
               </div>
@@ -674,9 +677,9 @@ export function MappingWorkbench({
         ) : null}
 
         <div className="flex gap-3">
-          <Button variant="outline" onClick={handleBack}>Back to upload</Button>
-          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(DEFAULT_ACTIVITY_STEPS); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); processStartTimeRef.current = 0; retriggerCooldownRef.current = 0; setRetriggerCooldown(0); setHeuristicComplete(false); }}>
-            Retry
+          <Button variant="outline" onClick={handleBack}>{t("wizard.mapping.backToUpload")}</Button>
+          <Button onClick={() => { setPhase("init"); setErrorMessage(null); setMissingFieldsInfo(null); setWarningMessage(null); setActivitySteps(getDefaultActivitySteps(t)); setCompletedStepIds(new Set()); stepStartTimes.current.clear(); processStartTimeRef.current = 0; retriggerCooldownRef.current = 0; setRetriggerCooldown(0); setHeuristicComplete(false); }}>
+            {t("wizard.mapping.retry")}
           </Button>
           {runId && targetFields.length > 0 ? (
             <Button
@@ -696,7 +699,7 @@ export function MappingWorkbench({
                 setErrorMessage(null);
               }}
             >
-              Map manually
+              {t("wizard.mapping.mapManually")}
             </Button>
           ) : null}
         </div>
@@ -710,7 +713,7 @@ export function MappingWorkbench({
         <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] px-6 py-4">
           <span className="block h-3 w-3 rounded-full bg-[var(--color-warning)] animate-pulse" />
           <span className="text-sm text-[var(--color-muted)]">
-            {phase === "confirming" ? "Saving your mappings..." : "Generating output..."}
+            {phase === "confirming" ? t("wizard.mapping.savingMappings") : t("wizard.mapping.generatingOutput")}
           </span>
         </div>
       ) : null}
@@ -728,7 +731,7 @@ export function MappingWorkbench({
         <aside className="flex min-h-0 w-full shrink-0 flex-col gap-4 xl:w-[300px]">
           <div className="rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
             <div className="flex items-center justify-between">
-              <Badge variant="outline" className="rounded-full">Readiness</Badge>
+              <Badge variant="outline" className="rounded-full">{t("wizard.mapping.readiness")}</Badge>
               {isReady ? (
                 <Check className="h-4 w-4 text-[var(--color-success)]" />
               ) : null}
@@ -736,19 +739,19 @@ export function MappingWorkbench({
 
             <div className="mt-5 space-y-2 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-[var(--color-muted)]">Required mapped</span>
+                <span className="text-[var(--color-muted)]">{t("wizard.mapping.requiredMapped")}</span>
                 <span className="font-semibold">
                   {totalFields - blockingUnmapped}/{totalFields}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[var(--color-muted)]">Review recommended</span>
+                <span className="text-[var(--color-muted)]">{t("wizard.mapping.reviewRecommended")}</span>
                 <span className={clsx("font-semibold", needsReviewCount > 0 && "text-[var(--color-warning)]")}>
                   {needsReviewCount}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-[var(--color-muted)]">Unmapped</span>
+                <span className="text-[var(--color-muted)]">{t("wizard.mapping.unmapped")}</span>
                 <span className={clsx("font-semibold", unmappedCount > 0 && "text-[var(--color-error)]")}>
                   {unmappedCount}
                 </span>
@@ -759,24 +762,24 @@ export function MappingWorkbench({
               <div className="mt-4 rounded-xl border border-[rgba(176,0,32,0.15)] bg-[rgba(176,0,32,0.04)] px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-error)]">
                   <AlertTriangle className="h-4 w-4" />
-                  {blockingUnmapped} blocking issue{blockingUnmapped > 1 ? "s" : ""}
+                  {t(blockingUnmapped === 1 ? "wizard.mapping.blockingIssue" : "wizard.mapping.blockingIssues", { count: String(blockingUnmapped) })}
                 </div>
                 <p className="mt-1 text-xs text-[var(--color-muted)]">
-                  Required fields without mapping will prevent output generation.
+                  {t("wizard.mapping.blockingDesc")}
                 </p>
               </div>
             ) : mappings.length > 0 ? (
               <div className="mt-4 rounded-xl border border-[rgba(45,106,79,0.15)] bg-[rgba(45,106,79,0.04)] px-4 py-3">
                 <div className="flex items-center gap-2 text-sm font-medium text-[var(--color-success)]">
                   <Check className="h-4 w-4" />
-                  All requirements met
+                  {t("wizard.mapping.allMet")}
                 </div>
               </div>
             ) : null}
           </div>
 
           <div className="flex flex-col gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] p-6">
-            <Badge variant="outline" className="rounded-full">Actions</Badge>
+            <Badge variant="outline" className="rounded-full">{t("wizard.mapping.actions")}</Badge>
 
             <Dialog open={retriggerConfirmOpen} onOpenChange={setRetriggerConfirmOpen}>
               <DialogTrigger render={
@@ -788,22 +791,22 @@ export function MappingWorkbench({
                 >
                   <RotateCcw className="mr-2 h-4 w-4 shrink-0" />
                   {heuristicComplete
-                    ? "Matched — no retrigger needed"
+                    ? t("wizard.mapping.retriggerDisabled")
                     : retriggerCooldown > 0
-                      ? `Retrigger (${retriggerCooldown}s)`
-                      : "Retrigger auto-mapping"}
+                      ? t("wizard.mapping.retriggerCooldown", { seconds: String(retriggerCooldown) })
+                      : t("wizard.mapping.retriggerAuto")}
                 </Button>
               } />
               <DialogContent className="max-w-md">
                 <DialogHeader>
-                  <DialogTitle>Retrigger auto-mapping?</DialogTitle>
+                  <DialogTitle>{t("wizard.mapping.retriggerTitle")}</DialogTitle>
                 </DialogHeader>
                 <p className="text-sm text-[var(--color-muted)]">
-                  This will replace your current mappings with new AI suggestions. Any manual changes you made will be lost.
+                  {t("wizard.mapping.retriggerDesc")}
                 </p>
                 <div className="mt-4 flex justify-end gap-3">
                   <Button variant="outline" size="sm" onClick={() => setRetriggerConfirmOpen(false)}>
-                    Cancel
+                    {t("wizard.mapping.cancel")}
                   </Button>
                   <Button
                     size="sm"
@@ -812,7 +815,7 @@ export function MappingWorkbench({
                       handleRetriggerAutoMapping();
                     }}
                   >
-                    Yes, rerun mapping
+                    {t("wizard.mapping.yesRerun")}
                   </Button>
                 </div>
               </DialogContent>
@@ -821,15 +824,15 @@ export function MappingWorkbench({
             <Dialog>
               <DialogTrigger render={<Button variant="outline" className="w-full justify-start rounded-xl" size="sm" />}>
                 <Eye className="mr-2 h-4 w-4" />
-                Preview JSON
+                {t("wizard.mapping.previewJson")}
               </DialogTrigger>
               <DialogContent className="max-w-5xl max-h-[85vh]">
                 <DialogHeader>
-                  <DialogTitle>Output preview</DialogTitle>
+                  <DialogTitle>{t("wizard.mapping.outputPreview")}</DialogTitle>
                 </DialogHeader>
                 <ScrollArea className="max-h-[65vh] rounded-xl border border-[var(--color-border)] bg-[var(--color-cream-soft)] p-4 overflow-x-auto">
                   <pre className="m-0 text-[0.72rem] leading-relaxed text-[var(--color-ink)] whitespace-pre">
-                    {mappings.length > 0 ? jsonPreviewFromMappings(mappings) : "// No mappings yet"}
+                    {mappings.length > 0 ? jsonPreviewFromMappings(mappings) : t("wizard.mapping.noMappingsYet")}
                   </pre>
                 </ScrollArea>
               </DialogContent>
@@ -852,7 +855,7 @@ export function MappingWorkbench({
               }}
             >
               <Sparkles className="mr-2 h-4 w-4" />
-              Apply trim to text fields
+              {t("wizard.mapping.applyTrim")}
             </Button>
 
             <Button
@@ -873,7 +876,7 @@ export function MappingWorkbench({
               }}
             >
               <X className="mr-2 h-4 w-4" />
-              Reset suggestions
+              {t("wizard.mapping.resetSuggestions")}
             </Button>
           </div>
         </aside>
@@ -882,26 +885,26 @@ export function MappingWorkbench({
       <WizardFooter
         statusText={
           phase === "review" && isReady
-            ? "All required fields mapped"
+            ? t("wizard.mapping.statusAllMapped")
             : phase === "review" && !isReady
-              ? `${blockingUnmapped} required field${blockingUnmapped > 1 ? "s" : ""} unmapped`
+              ? t(blockingUnmapped === 1 ? "wizard.mapping.statusFieldsUnmapped" : "wizard.mapping.statusFieldsUnmappedPlural", { count: String(blockingUnmapped) })
               : phase === "confirming"
-                ? "Confirming mappings..."
+                ? t("wizard.mapping.statusConfirming")
                 : phase === "output"
-                  ? "Generating output..."
-                  : "Processing"
+                  ? t("wizard.mapping.statusGenerating")
+                  : t("wizard.mapping.statusProcessing")
         }
         statusReady={isReady}
         primaryLabel={
           phase === "confirming" || phase === "output"
-            ? "Processing..."
+            ? t("wizard.mapping.primaryProcessing")
             : isReady
-              ? "Confirm & Generate"
-              : "Review required fields"
+              ? t("wizard.mapping.primaryConfirm")
+              : t("wizard.mapping.primaryReview")
         }
         onPrimary={handleConfirm}
         primaryDisabled={!isReady || isBusy}
-        secondaryLabel="Back"
+        secondaryLabel={t("wizard.mapping.back")}
         onSecondary={handleBack}
       />
     </div>

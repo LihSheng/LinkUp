@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { getDashboardData } from "@/lib/dashboard/dashboard.service";
+import { serverT } from "@/i18n/server";
 
 export const dynamic = "force-dynamic";
 
@@ -37,9 +38,9 @@ export default async function HomePage() {
   return (
     <div className="dashboard-page">
       <section className="dashboard-hero">
-        <h1>Ready to start mapping?</h1>
+        <h1>{serverT("dashboard.heroTitle")}</h1>
         <p className="dashboard-lede">
-          {summary.uploadedFiles} uploads, {summary.mappingRuns} mapping runs, and {summary.generatedOutputs} generated outputs are already in the database.
+          {serverT("dashboard.heroLedger", { uploads: String(summary.uploadedFiles), runs: String(summary.mappingRuns), outputs: String(summary.generatedOutputs) })}
         </p>
       </section>
 
@@ -51,16 +52,16 @@ export default async function HomePage() {
               <circle cx="12" cy="12" r="7" />
             </svg>
           </div>
-          <h2>New Mapping</h2>
+          <h2>{serverT("dashboard.newMapping")}</h2>
           <p>
-            Step 1: Select or upload your source template to begin schema alignment.
+            {serverT("dashboard.newMappingDesc")}
           </p>
           <Link href="/wizard/schema" className="dashboard-start-wizard">
-            Start Wizard &rarr;
+            {serverT("dashboard.startWizard")}
           </Link>
         </article>
 
-        <article className="dashboard-stats-card" aria-label="Workspace metrics">
+        <article className="dashboard-stats-card" aria-label={serverT("dashboard.metricsAriaLabel")}>
           <div className="dashboard-stats-grid">
             {metrics.map((metric) => (
               <div key={metric.label} className="dashboard-stat">
@@ -79,9 +80,9 @@ export default async function HomePage() {
 
       <section className="dashboard-section">
         <div className="dashboard-section-head">
-          <h2>Active Mappings</h2>
+          <h2>{serverT("dashboard.activeMappings")}</h2>
           <Link href="/wizard/output" className="dashboard-section-link">
-            View Public History
+            {serverT("dashboard.viewHistory")}
           </Link>
         </div>
 

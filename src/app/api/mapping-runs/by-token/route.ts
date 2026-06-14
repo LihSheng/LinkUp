@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 export const { GET } = defineApiRouteHandlers({
   GET: async (request: NextRequest) => {
@@ -10,7 +11,7 @@ export const { GET } = defineApiRouteHandlers({
 
     if (!token) {
       return NextResponse.json(
-        { error: "Draft token is required." },
+        { error: serverT("api.draftTokenRequired") },
         { status: 400 },
       );
     }
@@ -26,7 +27,7 @@ export const { GET } = defineApiRouteHandlers({
 
     if (!run) {
       return NextResponse.json(
-        { error: "Draft not found." },
+        { error: serverT("api.draftNotFound") },
         { status: 404 },
       );
     }

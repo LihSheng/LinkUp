@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { previewWorkbook, readWorkbookMeta } from "@/lib/excel/excel.service";
 import { prisma } from "@/lib/prisma";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
+import { serverT } from "@/i18n/server";
 
 type Params = Promise<{ id: string }>;
 
@@ -17,7 +18,7 @@ export const { GET } = defineApiRouteHandlers({
     });
 
     if (!uploadedFile) {
-      return NextResponse.json({ error: "Uploaded file was not found." }, { status: 404 });
+      return NextResponse.json({ error: serverT("api.uploadedFileNotFound") }, { status: 404 });
     }
 
     let workbookMeta = uploadedFile.workbookMeta;

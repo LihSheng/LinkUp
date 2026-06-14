@@ -29,10 +29,10 @@ function AlertDialogOverlay({
   ...props
 }: React.ComponentPropsWithoutRef<typeof AlertDialogPrimitive.Overlay>) {
   return (
-    <AlertDialogPrimitive.Overlay
+      <AlertDialogPrimitive.Overlay
       data-slot="alert-dialog-overlay"
       className={cn(
-        "fixed inset-0 z-50 bg-black/12 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
+        "fixed inset-0 z-50 bg-black/12 backdrop-blur-[2px] dark:bg-black/32 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=closed]:animate-out data-[state=closed]:fade-out-0",
         className,
       )}
       {...props}
@@ -50,7 +50,7 @@ function AlertDialogContent({
       <AlertDialogPrimitive.Content
         data-slot="alert-dialog-content"
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid w-[min(92vw,480px)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[22px] border border-[var(--color-border)] bg-white p-6 text-[var(--color-ink)] shadow-[0_24px_60px_rgba(28,28,28,0.18)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
+          "fixed left-1/2 top-1/2 z-50 grid w-[min(92vw,480px)] -translate-x-1/2 -translate-y-1/2 gap-4 rounded-[22px] border border-[var(--color-border)] bg-[var(--color-cream-soft)] p-6 text-[var(--color-ink)] shadow-[0_24px_60px_rgba(28,28,28,0.18)] outline-none data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95",
           className,
         )}
         {...props}
@@ -105,7 +105,7 @@ function AlertDialogDescription({
   return (
     <AlertDialogPrimitive.Description
       data-slot="alert-dialog-description"
-      className={cn("text-sm text-[#6f726f]", className)}
+      className={cn("text-sm text-[var(--color-muted)]", className)}
       {...props}
     />
   );
