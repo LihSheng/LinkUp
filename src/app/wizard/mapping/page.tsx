@@ -19,10 +19,11 @@ export default function MappingStepPage() {
   const sheet = searchParams.get("sheet");
   const templateId = searchParams.get("templateId");
   const runId = searchParams.get("runId");
-  const { completeStep, isStepAccessible } = useWizardProgress();
+  const { completeStep, isStepAccessible, activeRunId } = useWizardProgress();
+  const effectiveRunId = runId ?? activeRunId;
 
   const { data: existingRun, isLoading: isRunLoading } = useSWR(
-    runId ? `/api/mapping-runs/${runId}` : null,
+    effectiveRunId ? `/api/mapping-runs/${effectiveRunId}` : null,
     fetcher,
   );
 
@@ -37,9 +38,9 @@ export default function MappingStepPage() {
     if (uploadId) params.set("uploadId", uploadId);
     if (sheet) params.set("sheet", sheet);
     if (templateId) params.set("templateId", templateId);
-    if (runId) params.set("runId", runId);
+    if (effectiveRunId) params.set("runId", effectiveRunId);
     router.push(`/wizard/workbook?${params.toString()}`);
-  }, [router, uploadId, sheet, templateId, runId]);
+  }, [router, uploadId, sheet, templateId, effectiveRunId]);
 
   const handleComplete = useCallback((completedRunId?: string, mappingTemplateId?: string) => {
     completeStep(2);
@@ -56,7 +57,7 @@ export default function MappingStepPage() {
   const initialTargetFields = run?.targetFields as TargetField[] | undefined;
   const initialColumnProfiles = run?.columnProfiles as ColumnProfile[] | undefined;
 
-  if (runId && isRunLoading) {
+  if (effectiveRunId && isRunLoading) {
     return (
       <div className="flex min-h-0 w-full flex-1 items-center justify-center">
         <p className="text-sm text-[var(--color-muted)]">{t("wizard.mapping.loadingDraft")}</p>
@@ -65,13 +66,13 @@ export default function MappingStepPage() {
   }
 
   return (
-    <MappingWorkbench
-      onBack={handleBack}
-      onComplete={handleComplete}
-      initialRunId={runId ?? undefined}
-      initialTargetFields={initialTargetFields}
-      initialColumnProfiles={initialColumnProfiles}
-      initialMappings={initialMappings}
+      <MappingWorkbench
+        onBack={handleBack}
+        onComplete={handleComplete}
+        initialRunId={effectiveRunId ?? undefined}
+        initialTargetFields={initialTargetFields}
+        initialColumnProfiles={initialColumnProfiles}
+        initialMappings={initialMappings}
     />
   );
 }

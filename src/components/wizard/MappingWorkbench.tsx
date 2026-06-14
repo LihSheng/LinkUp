@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
-import { Sparkles, Check, AlertTriangle, X, Eye, Circle, RotateCcw } from "lucide-react";
+import { Sparkles, Check, AlertTriangle, X, Eye, Circle, RotateCcw, Shield, Info } from "lucide-react";
 import clsx from "clsx";
 
 import { MappingReviewTable } from "@/components/MappingReviewTable";
@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { WizardFooter } from "@/components/wizard/WizardFooter";
 import { toast } from "@/components/ui/sonner";
-import type { ColumnProfile, FieldMapping, TargetField } from "@/lib/mapping/mapping.types";
+import type { ColumnProfile, FieldMapping, TargetField, MaskedRowPattern } from "@/lib/mapping/mapping.types";
 
 type MissingFieldsInfo = {
   missingRequiredFields: string[];
@@ -32,7 +32,19 @@ type MissingFieldsInfo = {
   };
 };
 
-type WorkbenchPhase = "init" | "creating-run" | "analyzing" | "review" | "confirming" | "output" | "error";
+type MaskingAuditSummary = {
+  sourceMode: "headered" | "headerless";
+  maskedColumnProfilesSent: boolean;
+  maskedRowPatternsSent: boolean;
+  maskedRowPatternCount: number;
+  provider: string;
+  timestamp: string;
+};
+
+type WorkbenchPhase =
+  | "init" | "creating-run" | "analyzing" | "review"
+  | "confirming" | "output" | "error"
+  | "header-resolution";
 
 type StepStatus = "pending" | "processing" | "done";
 
@@ -50,8 +62,14 @@ type CreateRunResponse = {
     columnProfiles: ColumnProfile[];
     sampleRows: Record<string, unknown>[];
     status: string;
+    sourceMode?: string;
+    headerless?: boolean;
+    maskingAudit?: MaskingAuditSummary;
     suggestedMapping?: { mappings: FieldMapping[] } | null;
   };
+  headerResolutionRequired?: boolean;
+  sourceSheetName?: string;
+  sheetNames?: string[];
   missingRequiredFields?: string[];
   detection?: {
     headerRowIndex: number;
@@ -123,13 +141,22 @@ function jsonPreviewFromMappings(mappings: FieldMapping[]): string {
 
 function getDefaultActivitySteps(t: (key: string) => string): ActivityStep[] {
   return [
-    { id: 0, label: t("wizard.mapping.activityPreparing"), status: "pending", elapsed: null },
-    { id: 1, label: t("wizard.mapping.activityReading"), status: "pending", elapsed: null },
-    { id: 2, label: t("wizard.mapping.activityFinding"), status: "pending", elapsed: null },
-    { id: 3, label: t("wizard.mapping.activityChecking"), status: "pending", elapsed: null },
-    { id: 4, label: t("wizard.mapping.activityComplete"), status: "pending", elapsed: null },
-    { id: 5, label: t("wizard.mapping.activityPreparingReview"), status: "pending", elapsed: null },
+    { id: 0, label: t("wizard.shell.steps.mapping.activityPreparing"), status: "pending", elapsed: null },
+    { id: 1, label: t("wizard.shell.steps.mapping.activityReading"), status: "pending", elapsed: null },
+    { id: 2, label: t("wizard.shell.steps.mapping.activityFinding"), status: "pending", elapsed: null },
+    { id: 3, label: t("wizard.shell.steps.mapping.activityChecking"), status: "pending", elapsed: null },
+    { id: 4, label: t("wizard.shell.steps.mapping.activityComplete"), status: "pending", elapsed: null },
+    { id: 5, label: t("wizard.shell.steps.mapping.activityPreparingReview"), status: "pending", elapsed: null },
   ];
+}
+
+function getProviderDisplayName(provider: string): string {
+  switch (provider) {
+    case "ollama": return "Ollama";
+    case "lmstudio": return "LM Studio";
+    case "nvidia": return "NVIDIA";
+    default: return provider;
+  }
 }
 
 export function MappingWorkbench({
@@ -156,6 +183,8 @@ export function MappingWorkbench({
   const [targetFields, setTargetFields] = useState<TargetField[]>(initialTargetFields ?? []);
   const [columnProfiles, setColumnProfiles] = useState<ColumnProfile[]>(initialColumnProfiles ?? []);
   const [mappings, setMappings] = useState<FieldMapping[]>(initialMappings ?? []);
+  const [sourceMode, setSourceMode] = useState<"headered" | "headerless">("headered");
+  const [maskingAudit, setMaskingAudit] = useState<MaskingAuditSummary | null>(null);
 
   const [activitySteps, setActivitySteps] = useState<ActivityStep[]>(getDefaultActivitySteps(t));
   const [completedStepIds, setCompletedStepIds] = useState<Set<number>>(new Set());
@@ -169,6 +198,8 @@ export function MappingWorkbench({
   const processStartTimeRef = useRef<number>(0);
   const retriggerCooldownRef = useRef(0);
   const [tick, setTick] = useState(0);
+
+  const [headerSheetNames, setHeaderSheetNames] = useState<string[]>([]);
 
   const updateStepStatus = useCallback((stepId: number, status: StepStatus) => {
     const now = Date.now();
@@ -198,7 +229,7 @@ export function MappingWorkbench({
     );
   }, []);
 
-  const runPhase = useCallback(async () => {
+  const createRunAndSuggest = useCallback(async (overrides?: { sourceMode?: "headered" | "headerless"; headerResolution?: { action: "use_first_row" | "headerless" } }) => {
     setPhase("creating-run");
     processStartTimeRef.current = Date.now();
     updateStepStatus(0, "done");
@@ -206,7 +237,94 @@ export function MappingWorkbench({
     updateStepStatus(1, "processing");
 
     try {
-      if (runId) {
+      const body: Record<string, unknown> = {
+        uploadedFileId: uploadId,
+        schemaTemplateId: templateId,
+        sourceSheetName: sheet || null,
+      };
+      if (overrides?.sourceMode) body.sourceMode = overrides.sourceMode;
+      if (overrides?.headerResolution) body.headerResolution = overrides.headerResolution;
+
+      const createRes = await fetch("/api/mapping-runs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const createData: CreateRunResponse = await createRes.json();
+
+      if (!createRes.ok) {
+        if (createRes.status === 422 && createData.missingRequiredFields) {
+          setMissingFieldsInfo({
+            missingRequiredFields: createData.missingRequiredFields,
+            detection: createData.detection ?? { headerRowIndex: 0, matchedFields: [], confidence: 0, ambiguous: false },
+          });
+          throw new Error(`Required fields missing from workbook: ${(createData.missingRequiredFields as string[]).join(", ")}`);
+        }
+        throw new Error(createData.error ?? "Failed to create mapping run.");
+      }
+
+      if (createData.headerResolutionRequired) {
+        setHeaderSheetNames(createData.sheetNames ?? []);
+        setPhase("header-resolution");
+        return;
+      }
+
+      const run = createData.run;
+      setRunId(run.id);
+      setTargetFields(run.targetFields);
+      setColumnProfiles(run.columnProfiles);
+      setSourceMode((run.sourceMode as "headered" | "headerless") ?? "headered");
+      setMaskingAudit(run.maskingAudit ?? null);
+      updateStepStatus(1, "done");
+      if (createData.warning) {
+        setWarningMessage(createData.warning);
+      }
+
+      await new Promise((r) => setTimeout(r, 400));
+      setPhase("analyzing");
+      updateStepStatus(2, "processing");
+
+      const suggestRes = await fetch(`/api/mapping-runs/${run.id}/suggest`, {
+        method: "POST",
+      });
+      const suggestData: SuggestResponse & { error?: string } = await suggestRes.json();
+
+      if (!suggestRes.ok) {
+        throw new Error(suggestData.error ?? "AI matching failed.");
+      }
+
+      updateStepStatus(2, "done");
+
+      const suggested = suggestData.run.suggestedMapping?.mappings ?? [];
+      setMappings(suggested);
+      setHeuristicComplete(suggestData.run.suggestDiagnostics?.heuristicComplete ?? false);
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(3, "done");
+
+      await new Promise((r) => setTimeout(r, 300));
+      updateStepStatus(4, "done");
+
+      updateStepStatus(5, "processing");
+      await new Promise((r) => setTimeout(r, 2000));
+      updateStepStatus(5, "done");
+
+      setPhase("review");
+    } catch (err) {
+      setPhase("error");
+      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+      setErrorMessage(msg);
+    }
+  }, [uploadId, templateId, sheet, updateStepStatus]);
+
+  const runPhase = useCallback(async () => {
+    if (runId) {
+      setPhase("creating-run");
+      processStartTimeRef.current = Date.now();
+      updateStepStatus(0, "done");
+      await new Promise((r) => setTimeout(r, 350));
+      updateStepStatus(1, "processing");
+
+      try {
         const profileRes = await fetch(`/api/mapping-runs/${runId}/profile`, {
           method: "POST",
         });
@@ -220,6 +338,8 @@ export function MappingWorkbench({
         setRunId(profileRun.id);
         setTargetFields(profileRun.targetFields);
         setColumnProfiles(profileRun.columnProfiles);
+        setSourceMode((profileRun.sourceMode as "headered" | "headerless") ?? "headered");
+        setMaskingAudit(profileRun.maskingAudit ?? null);
         updateStepStatus(1, "done");
         if (profileData.warning) {
           setWarningMessage(profileData.warning);
@@ -255,80 +375,22 @@ export function MappingWorkbench({
 
         setPhase("review");
         return;
-      }
-
-      if (!uploadId || !templateId) {
+      } catch (err) {
         setPhase("error");
-        setErrorMessage("Missing upload ID or template ID. Please go back and try again.");
+        const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
+        setErrorMessage(msg);
         return;
       }
-
-      const createRes = await fetch("/api/mapping-runs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          uploadedFileId: uploadId,
-          schemaTemplateId: templateId,
-          sourceSheetName: sheet || null,
-        }),
-      });
-      const createData: CreateRunResponse = await createRes.json();
-
-      if (!createRes.ok) {
-        if (createRes.status === 422 && createData.missingRequiredFields) {
-          setMissingFieldsInfo({
-            missingRequiredFields: createData.missingRequiredFields,
-            detection: createData.detection ?? { headerRowIndex: 0, matchedFields: [], confidence: 0, ambiguous: false },
-          });
-          throw new Error(`Required fields missing from workbook: ${(createData.missingRequiredFields as string[]).join(", ")}`);
-        }
-        throw new Error(createData.error ?? "Failed to create mapping run.");
-      }
-
-      const run = createData.run;
-      setRunId(run.id);
-      setTargetFields(run.targetFields);
-      setColumnProfiles(run.columnProfiles);
-      updateStepStatus(1, "done");
-      if (createData.warning) {
-        setWarningMessage(createData.warning);
-      }
-
-      await new Promise((r) => setTimeout(r, 400));
-      setPhase("analyzing");
-      updateStepStatus(2, "processing");
-
-      const suggestRes = await fetch(`/api/mapping-runs/${run.id}/suggest`, {
-        method: "POST",
-      });
-      const suggestData2: SuggestResponse & { error?: string } = await suggestRes.json();
-
-      if (!suggestRes.ok) {
-        throw new Error(suggestData2.error ?? "AI matching failed.");
-      }
-
-      updateStepStatus(2, "done");
-
-      const suggested = suggestData2.run.suggestedMapping?.mappings ?? [];
-      setMappings(suggested);
-      setHeuristicComplete(suggestData2.run.suggestDiagnostics?.heuristicComplete ?? false);
-      await new Promise((r) => setTimeout(r, 300));
-      updateStepStatus(3, "done");
-
-      await new Promise((r) => setTimeout(r, 300));
-      updateStepStatus(4, "done");
-
-      updateStepStatus(5, "processing");
-      await new Promise((r) => setTimeout(r, 2000));
-      updateStepStatus(5, "done");
-
-      setPhase("review");
-    } catch (err) {
-      setPhase("error");
-      const msg = err instanceof Error ? err.message : "An unexpected error occurred.";
-      setErrorMessage(msg);
     }
-  }, [uploadId, templateId, sheet, runId, updateStepStatus]);
+
+    if (!uploadId || !templateId) {
+      setPhase("error");
+      setErrorMessage("Missing upload ID or template ID. Please go back and try again.");
+      return;
+    }
+
+    await createRunAndSuggest();
+  }, [uploadId, templateId, sheet, runId, updateStepStatus, createRunAndSuggest]);
 
   useEffect(() => {
     if (phase !== "init") return;
@@ -513,6 +575,19 @@ export function MappingWorkbench({
     }
   }, [runId, updateStepStatus]);
 
+  const handleHeaderResolution = useCallback(async (action: "use_first_row" | "headerless" | "choose_template") => {
+    if (action === "choose_template") {
+      onBack?.();
+      return;
+    }
+
+    if (action === "headerless") {
+      await createRunAndSuggest({ sourceMode: "headerless" });
+    } else {
+      await createRunAndSuggest({ headerResolution: { action } });
+    }
+  }, [createRunAndSuggest, onBack]);
+
   const autoMappedCount = mappings.filter((m) => m.sourceColumn && m.confidence >= 0.5).length;
   const needsReviewCount = mappings.filter((m) => m.sourceColumn && m.confidence < 0.5).length;
   const unmappedCount = mappings.filter((m) => !m.sourceColumn).length;
@@ -522,6 +597,65 @@ export function MappingWorkbench({
 
   const isBusy = phase === "creating-run" || phase === "analyzing" || phase === "confirming" || phase === "output";
 
+  if (phase === "header-resolution") {
+    return (
+      <div className="mx-auto flex min-h-0 h-full w-full max-w-[600px] flex-1 flex-col justify-center gap-6 px-1">
+        <div className="flex flex-col items-center text-center">
+          <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-[rgba(255,214,102,0.18)]">
+            <AlertTriangle className="h-8 w-8 text-[var(--color-warning)]" />
+          </div>
+          <h3 className="text-xl font-semibold text-[var(--color-ink)]">
+            {t("wizard.mapping.noHeaderFound")}
+          </h3>
+          <p className="mt-2 text-sm text-[var(--color-muted)]">
+            {t("wizard.mapping.noHeaderFoundDesc")}
+          </p>
+        </div>
+
+        {headerSheetNames.length > 0 ? (
+          <p className="text-xs text-[var(--color-muted)] text-center">
+            {t("wizard.workbook.sheets")}: {headerSheetNames.join(", ")}
+          </p>
+        ) : null}
+
+        <div className="flex flex-col gap-3">
+          <Button
+            variant="outline"
+            className="w-full justify-start rounded-xl py-6 px-5 h-auto"
+            onClick={() => handleHeaderResolution("use_first_row")}
+          >
+            <div className="text-left">
+              <div className="font-medium">{t("wizard.mapping.headerResolveUseFirstRow")}</div>
+              <div className="text-xs text-[var(--color-muted)] mt-1">{t("wizard.mapping.headerResolveUseFirstRowDesc")}</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start rounded-xl py-6 px-5 h-auto"
+            onClick={() => handleHeaderResolution("headerless")}
+          >
+            <div className="text-left">
+              <div className="font-medium">{t("wizard.mapping.headerResolveHeaderless")}</div>
+              <div className="text-xs text-[var(--color-muted)] mt-1">{t("wizard.mapping.headerResolveHeaderlessDesc")}</div>
+            </div>
+          </Button>
+
+          <Button
+            variant="outline"
+            className="w-full justify-start rounded-xl py-6 px-5 h-auto"
+            onClick={() => handleHeaderResolution("choose_template")}
+          >
+            <div className="text-left">
+              <div className="font-medium">{t("wizard.mapping.headerResolveChooseTemplate")}</div>
+              <div className="text-xs text-[var(--color-muted)] mt-1">{t("wizard.mapping.headerResolveChooseTemplateDesc")}</div>
+            </div>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   if (phase === "init" || phase === "creating-run" || phase === "analyzing") {
     return (
       <div className="mx-auto flex min-h-0 h-full w-full max-w-[800px] flex-1 flex-col justify-center gap-6 px-1 overflow-hidden relative">
@@ -530,6 +664,7 @@ export function MappingWorkbench({
             {warningMessage}
           </div>
         ) : null}
+
         <div className="flex flex-col overflow-hidden rounded-xl bg-transparent">
           <div className="flex flex-col items-center px-10 pb-6 pt-10 text-center">
             <h3 className="m-0 font-[var(--font-display)] text-[clamp(2.2rem,3.6vw,3.2rem)] font-semibold tracking-[-0.07rem] text-[var(--color-ink)]">
@@ -575,12 +710,20 @@ export function MappingWorkbench({
                 </div>
               ))}
             </div>
+            {maskingAudit || sourceMode === "headerless" ? (
+              <div className="mt-5 flex items-center justify-center gap-2 text-xs text-[var(--color-success)]">
+                <Shield className="h-3.5 w-3.5 shrink-0" />
+                <span>{t("wizard.mapping.trustStatement")}</span>
+              </div>
+            ) : null}
           </div>
 
           {showSoftMessage && (
-            <p className="text-sm text-[var(--color-muted)] text-center mt-4">
-              {t("wizard.mapping.stillMatching")}
-            </p>
+            <div className="mt-4 space-y-2 text-center">
+              <p className="text-sm text-[var(--color-muted)]">
+                {t("wizard.mapping.stillMatching")}
+              </p>
+            </div>
           )}
 
           {showManualButton && runId && targetFields.length > 0 ? (
@@ -709,6 +852,39 @@ export function MappingWorkbench({
 
   return (
     <div className="flex min-h-0 h-full w-full flex-1 flex-col gap-6 overflow-hidden">
+      {sourceMode === "headerless" ? (
+        <div className="rounded-xl border border-[rgba(255,214,102,0.3)] bg-[rgba(255,214,102,0.1)] px-5 py-3 text-sm text-[var(--color-warning)]">
+          <div className="flex items-center gap-2 font-medium">
+            <Info className="h-4 w-4" />
+            {t("wizard.mapping.headerlessBanner")}
+          </div>
+          <p className="mt-1 text-xs opacity-80">
+            {t("wizard.mapping.headerlessBannerDesc")}
+          </p>
+        </div>
+      ) : null}
+
+      {maskingAudit || sourceMode === "headerless" ? (
+        <div className="rounded-xl border border-[rgba(45,106,79,0.15)] bg-[rgba(45,106,79,0.04)] px-5 py-3 text-sm">
+          <div className="flex items-center gap-2 text-[var(--color-success)]">
+            <Shield className="h-4 w-4" />
+            <span>{t("wizard.mapping.trustStatement")}</span>
+          </div>
+          {maskingAudit ? (
+            <div className="mt-1 flex items-center gap-1 text-xs text-[var(--color-muted)]">
+              <span>
+                {t("wizard.mapping.providerDetails", {
+                  provider: getProviderDisplayName(maskingAudit.provider),
+                  payload: maskingAudit.maskedRowPatternsSent
+                    ? t("wizard.mapping.payloadProfilesAndPatterns")
+                    : t("wizard.mapping.payloadProfilesOnly"),
+                })}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {phase === "confirming" || phase === "output" ? (
         <div className="flex items-center gap-3 rounded-xl border border-[var(--color-border)] bg-[rgba(252,251,248,0.9)] px-6 py-4">
           <span className="block h-3 w-3 rounded-full bg-[var(--color-warning)] animate-pulse" />
@@ -774,6 +950,37 @@ export function MappingWorkbench({
                   <Check className="h-4 w-4" />
                   {t("wizard.mapping.allMet")}
                 </div>
+              </div>
+            ) : null}
+
+            {maskingAudit ? (
+              <div className="mt-4 border-t border-[var(--color-border)] pt-4">
+                <details className="group">
+                  <summary className="flex cursor-pointer items-center gap-2 text-xs text-[var(--color-muted)] hover:text-[var(--color-ink)]">
+                    <Info className="h-3 w-3" />
+                    {t("wizard.mapping.maskingDetails")}
+                  </summary>
+                  <div className="mt-2 space-y-1 text-[11px] text-[var(--color-muted)]">
+                    <div className="flex justify-between">
+                      <span>{t("wizard.mapping.sourceMode")}</span>
+                      <span className="font-medium">{maskingAudit.sourceMode === "headerless" ? t("wizard.mapping.headerless") : t("wizard.mapping.headered")}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>{t("wizard.mapping.profilesSent")}</span>
+                      <span className="font-medium">{maskingAudit.maskedColumnProfilesSent ? t("wizard.mapping.yes") : t("wizard.mapping.no")}</span>
+                    </div>
+                    {maskingAudit.maskedRowPatternsSent ? (
+                      <div className="flex justify-between">
+                        <span>{t("wizard.mapping.rowPatterns")}</span>
+                        <span className="font-medium">{maskingAudit.maskedRowPatternCount}</span>
+                      </div>
+                    ) : null}
+                    <div className="flex justify-between">
+                      <span>{t("wizard.mapping.provider")}</span>
+                      <span className="font-medium">{getProviderDisplayName(maskingAudit.provider)}</span>
+                    </div>
+                  </div>
+                </details>
               </div>
             ) : null}
           </div>

@@ -12,6 +12,11 @@ export const createRunSchema = z.object({
   sourceSheetName: z.string().optional().nullable(),
   displayName: z.string().min(1).optional(),
   mappingTemplateId: z.string().min(1).optional(),
+  sourceMode: z.enum(["headered", "headerless"]).optional(),
+  headerResolution: z.object({
+    action: z.enum(["use_first_row", "headerless", "choose_template"]),
+    userSelected: z.boolean().optional(),
+  }).optional(),
 });
 
 export const updateRunSchema = z.object({

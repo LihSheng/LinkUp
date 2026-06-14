@@ -99,13 +99,16 @@ export default function SchemaStepPage() {
   const searchParams = useSearchParams();
   const existingRunId = searchParams.get("runId");
   const existingTemplateId = searchParams.get("templateId");
-  const { completeStep, resetProgress } = useWizardProgress();
+  const { completeStep, resetProgress, setActiveRunId } = useWizardProgress();
 
   useEffect(() => {
     if (!existingRunId) {
       resetProgress();
+      setActiveRunId(null);
+    } else {
+      setActiveRunId(existingRunId);
     }
-  }, [resetProgress, existingRunId]);
+  }, [resetProgress, existingRunId, setActiveRunId]);
   const [selected, setSelected] = useState<string | null>(existingTemplateId ?? null);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [inspectedTemplateId, setInspectedTemplateId] = useState<string | null>(null);
@@ -341,6 +344,7 @@ export default function SchemaStepPage() {
     setTriedContinue(false);
 
     if (existingRunId) {
+      setActiveRunId(existingRunId);
       completeStep(0);
       const params = new URLSearchParams({
         templateId: selectedTemplate.id,
@@ -368,6 +372,7 @@ export default function SchemaStepPage() {
       );
 
       completeStep(0);
+      setActiveRunId(createResult.run.id);
       const params = new URLSearchParams({
         templateId: selectedTemplate.id,
         runId: createResult.run.id,

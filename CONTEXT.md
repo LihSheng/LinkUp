@@ -5,10 +5,15 @@ Use this file as the first stop before re-exploring the repo.
 ## Glossary
 
 - `schema template`: the reusable target schema definition a user chooses before uploading source data.
+- `header resolution`: the user decision made when LinkUp cannot confidently choose a workbook header row.
 - `mapping run`: one wizard session for one source upload matched against one schema template.
 - `mapping template`: the reusable finalized mapping result created after confirm, used for future imports.
 - `draft token`: the unguessable token that resumes a specific mapping run.
 - `display name`: the editable human label for a mapping run or mapping template.
+- `headerless workbook`: an Excel or CSV source table that has data rows but no confirmed header row, so LinkUp uses synthetic source column names.
+- `masked column profile`: a source-column summary safe enough for the mapping engine, using column identity, detected type, statistics, and masked sample patterns instead of raw uploaded values.
+- `masked row pattern`: a limited cross-column sample used only when column profiles are not enough, where every cell is masked and unsafe free-text values are omitted.
+- `masking audit summary`: a non-sensitive record of what sanitized data shape was shared with the mapping engine for a mapping run.
 
 ## 1. Project Shape
 

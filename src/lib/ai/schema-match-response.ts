@@ -41,7 +41,9 @@ export function buildCompactSchemaMatchInput(input: SchemaMatchInput): SchemaMat
       ...column,
       samples: column.samples.slice(0, 3),
     })),
-    sampleRows: input.sampleRows.slice(0, 6),
+    sampleRows: [],
+    maskedRowPatterns: input.maskedRowPatterns?.slice(0, 3),
+    sourceMode: input.sourceMode ?? "headered",
   };
 }
 

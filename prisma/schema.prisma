@@ -29,22 +29,26 @@ model UploadedFile {
 }
 
 model MappingRun {
-  id                String            @id @default(cuid())
-  uploadedFileId    String?
-  schemaTemplateId  String
-  sourceSheetName   String?
-  columnProfiles    Json?
-  sampleRows        Json?
-  suggestedMapping  Json?
-  confirmedMapping  Json?
-  draftToken        String?           @unique
-  displayName       String?
-  status            String            @default("draft")
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
-  uploadedFile      UploadedFile?     @relation(fields: [uploadedFileId], references: [id])
-  schemaTemplate    SchemaTemplate    @relation(fields: [schemaTemplateId], references: [id])
-  output            GeneratedOutput?
+  id               String           @id @default(cuid())
+  uploadedFileId   String?
+  schemaTemplateId String
+  sourceSheetName  String?
+  sourceMode       String           @default("headered")
+  columnProfiles   Json?
+  sampleRows       Json?
+  maskingAudit     Json?
+  maskedRowPatterns Json?
+  headerResolution Json?
+  suggestedMapping Json?
+  confirmedMapping Json?
+  draftToken       String?          @unique
+  displayName      String?
+  status           String           @default("draft")
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  output           GeneratedOutput?
+  schemaTemplate   SchemaTemplate   @relation(fields: [schemaTemplateId], references: [id])
+  uploadedFile     UploadedFile?    @relation(fields: [uploadedFileId], references: [id])
 }
 
 model MappingTemplate {

@@ -1981,7 +1981,11 @@ summary::-webkit-details-marker {
 
 .wizard-step-nav {
   display: grid;
+  flex: 0 0 auto;
+  width: 100%;
   gap: 6px;
+  align-content: start;
+  grid-auto-rows: max-content;
 }
 
 .wizard-step-item {

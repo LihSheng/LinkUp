@@ -48,6 +48,16 @@ function pickBestSheetName(
   return sheetNames.find((name) => workbook.SheetNames.includes(name)) ?? null;
 }
 
+export async function readWorkbookRows(params: {
+  filePath: string;
+  preferredSheetName?: string | null;
+}): Promise<{ sheetName: string; sheetNames: string[]; rows: unknown[][] }> {
+  const workbook = await readWorkbook(params.filePath);
+  const sheetName = pickBestSheetName(workbook, workbook.SheetNames, params.preferredSheetName);
+  if (!sheetName) throw new Error("Workbook does not contain any sheets.");
+  return { sheetName, sheetNames: workbook.SheetNames, rows: toRows(workbook, sheetName) };
+}
+
 export async function readWorkbookMeta(filePath: string) {
   const workbook = await readWorkbook(filePath);
 
@@ -178,6 +188,86 @@ function previewFallback(params: {
     sourceSheetName: params.sheetName,
     sheetNames: params.sheetNames,
     headerRowIndex,
+    headers,
+    sampleRows,
+    columnProfiles: buildColumnProfiles(headers, sampleRows),
+  };
+}
+
+export function buildHeaderlessPreviewData(params: {
+  rows: unknown[][];
+  sheetName: string;
+  sheetNames: string[];
+  sampleLimit: number;
+}) {
+  const columnCount = params.rows.length > 0 ? Math.max(...params.rows.map((r) => r.length), 0) : 0;
+  const syntheticNames = Array.from({ length: columnCount }, (_, i) => {
+    let label = "";
+    let n = i;
+    while (n >= 0) {
+      label = String.fromCharCode(65 + (n % 26)) + label;
+      n = Math.floor(n / 26) - 1;
+    }
+    return `Column ${label}`;
+  });
+
+  const dataRows = params.rows.filter(
+    (row) => row.some((value) => String(value ?? "").trim() !== ""),
+  );
+
+  const sampleRows = dataRows.slice(0, params.sampleLimit).map((row) =>
+    Object.fromEntries(
+      syntheticNames.map((name, index) => [name, row[index] ?? null]),
+    ),
+  );
+
+  return {
+    sourceSheetName: params.sheetName,
+    sheetNames: params.sheetNames,
+    headerRowIndex: -1,
+    headers: syntheticNames,
+    sampleRows,
+    columnProfiles: buildColumnProfiles(syntheticNames, sampleRows),
+  };
+}
+
+export function buildFirstRowPreviewData(params: {
+  rows: unknown[][];
+  sheetName: string;
+  sheetNames: string[];
+  sampleLimit: number;
+}) {
+  if (params.rows.length === 0) {
+    return {
+      sourceSheetName: params.sheetName,
+      sheetNames: params.sheetNames,
+      headerRowIndex: 0,
+      headers: [],
+      sampleRows: [],
+      columnProfiles: [],
+    };
+  }
+
+  const rawHeaders = params.rows[0] ?? [];
+  const headers = rawHeaders.map((header, index) => {
+    const normalized = String(header ?? "").trim();
+    return normalized || `column_${index + 1}`;
+  });
+
+  const dataRows = params.rows.slice(1).filter(
+    (row) => row.some((value) => String(value ?? "").trim() !== ""),
+  );
+
+  const sampleRows = dataRows.slice(0, params.sampleLimit).map((row) =>
+    Object.fromEntries(
+      headers.map((header, index) => [header, row[index] ?? null]),
+    ),
+  );
+
+  return {
+    sourceSheetName: params.sheetName,
+    sheetNames: params.sheetNames,
+    headerRowIndex: 0,
     headers,
     sampleRows,
     columnProfiles: buildColumnProfiles(headers, sampleRows),

@@ -23,11 +23,18 @@ export type ColumnProfile = {
   uniqueCount?: number;
 };
 
+export type MaskedRowPattern = {
+  rowNumber: number;
+  values: Record<string, string>;
+};
+
 export type SchemaMatchInput = {
   targetJsonSchema: unknown;
   sourceSheetName: string;
   sourceColumns: ColumnProfile[];
   sampleRows: Record<string, unknown>[];
+  maskedRowPatterns?: MaskedRowPattern[];
+  sourceMode?: "headered" | "headerless";
 };
 
 export type FieldMapping = {

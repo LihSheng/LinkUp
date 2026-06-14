@@ -1,13 +1,19 @@
 import { NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
 
-import { previewWorkbook } from "@/lib/excel/excel.service";
+import {
+  previewWorkbook,
+  readWorkbookRows,
+  buildHeaderlessPreviewData,
+  buildFirstRowPreviewData,
+} from "@/lib/excel/excel.service";
 import { getRunWithRelations } from "@/lib/mapping/mapping.service";
 import { prisma } from "@/lib/prisma";
 import { flattenJsonSchema } from "@/lib/schema/json-schema";
 import type { CanonicalField } from "@/lib/excel/header-detection";
 import { defineApiRouteHandlers } from "@/lib/api-error-handler";
 import { serverT } from "@/i18n/server";
+import { maskWorkbookProfiles } from "@/lib/masking/masking.service";
 
 type RouteContext = {
   params: Promise<{ id: string }> | { id: string };
@@ -40,59 +46,98 @@ export const { POST } = defineApiRouteHandlers({
     }
 
     const targetFields = flattenJsonSchema(run.schemaTemplate.jsonSchema);
+    const sourceMode = (run.sourceMode as "headered" | "headerless") ?? "headered";
+    const headerResolution = run.headerResolution as
+      | { action?: "use_first_row" | "headerless" | "choose_template" }
+      | null;
 
-    let canonicalFields: CanonicalField[] | undefined;
+    let sourceSheetName: string;
+    let columnProfiles: import("@/lib/mapping/mapping.types").ColumnProfile[];
+    let sampleRows: Record<string, unknown>[];
 
-    if (run.schemaTemplate.canonicalFields) {
-      canonicalFields = run.schemaTemplate.canonicalFields as CanonicalField[];
+    if (sourceMode === "headerless") {
+      const { sheetName, rows } = await readWorkbookRows({
+        filePath: run.uploadedFile.storagePath,
+        preferredSheetName: run.sourceSheetName,
+      });
+      sourceSheetName = sheetName;
+
+      const preview = buildHeaderlessPreviewData({
+        rows,
+        sheetName,
+        sheetNames: [sheetName],
+        sampleLimit: 25,
+      });
+      columnProfiles = preview.columnProfiles;
+      sampleRows = preview.sampleRows;
+    } else if (headerResolution?.action === "use_first_row") {
+      const preview = await readWorkbookRows({
+        filePath: run.uploadedFile.storagePath,
+        preferredSheetName: run.sourceSheetName,
+      });
+
+      const firstRowPreview = buildFirstRowPreviewData({
+        rows: preview.rows,
+        sheetName: preview.sheetName,
+        sheetNames: preview.sheetNames,
+        sampleLimit: 25,
+      });
+
+      sourceSheetName = firstRowPreview.sourceSheetName;
+      columnProfiles = firstRowPreview.columnProfiles;
+      sampleRows = firstRowPreview.sampleRows;
     } else {
-      canonicalFields = targetFields.map((f) => ({
-        path: f.path,
-        type: f.type,
-        required: f.required,
-        description: f.description,
-      }));
+      let canonicalFields: CanonicalField[] | undefined;
+      if (run.schemaTemplate.canonicalFields) {
+        canonicalFields = run.schemaTemplate.canonicalFields as CanonicalField[];
+      } else {
+        canonicalFields = targetFields.map((f) => ({
+          path: f.path,
+          type: f.type,
+          required: f.required,
+          description: f.description,
+        }));
+      }
+
+      const preview = await previewWorkbook({
+        filePath: run.uploadedFile.storagePath,
+        preferredSheetName: run.sourceSheetName,
+        templateFields: canonicalFields,
+      });
+      sourceSheetName = preview.sourceSheetName;
+      columnProfiles = preview.columnProfiles;
+      sampleRows = preview.sampleRows;
     }
 
-    const preview = await previewWorkbook({
-      filePath: run.uploadedFile.storagePath,
-      preferredSheetName: run.sourceSheetName,
-      templateFields: canonicalFields,
+    const masked = maskWorkbookProfiles({
+      profiles: columnProfiles,
+      sampleRows,
+      sourceMode,
+      includeRowPatterns: sourceMode === "headerless",
     });
-
-    const hasDetection =
-      "detection" in preview && preview.detection !== undefined;
 
     const updated = await prisma.mappingRun.update({
       where: { id },
       data: {
-        columnProfiles: preview.columnProfiles as Prisma.InputJsonValue,
-        sampleRows: preview.sampleRows as Prisma.InputJsonValue,
-        sourceSheetName: preview.sourceSheetName,
+        columnProfiles: masked.maskedProfiles as Prisma.InputJsonValue,
+        sourceSheetName,
+        maskingAudit: masked.auditSummary as Prisma.InputJsonValue,
+        maskedRowPatterns: masked.maskedRowPatterns.length > 0
+          ? (masked.maskedRowPatterns as Prisma.InputJsonValue)
+          : undefined,
         status: "profiled",
       },
     });
 
-    const response: Record<string, unknown> = {
+    return NextResponse.json({
       run: {
         ...updated,
         uploadedFile: run.uploadedFile,
         schemaTemplate: run.schemaTemplate,
         targetFields,
         workbookMeta: run.uploadedFile.workbookMeta,
+        maskingAudit: masked.auditSummary,
       },
-    };
-
-    if (hasDetection) {
-      const detection = preview.detection!;
-      response.detection = {
-        headerRowIndex: detection.headerRowIndex,
-        matchedFields: detection.matchedFields,
-        confidence: detection.confidence,
-        ambiguous: detection.ambiguous,
-      };
-    }
-
-    return NextResponse.json(response);
+    });
   },
 });

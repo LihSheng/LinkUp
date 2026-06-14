@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 
@@ -31,12 +31,15 @@ const steps = [
 export function WizardShell({ children }: { children: React.ReactNode }) {
   const { t } = useTranslation();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
   const [showBackConfirm, setShowBackConfirm] = useState(false);
   const activeStep = steps.find((step) => step.href === pathname) ?? steps[0];
   const { isStepAccessible } = useWizardProgress();
   const showSharedTopBar = true;
   const requireBackConfirmation = true;
+  const queryString = searchParams.toString();
+  const stepHref = (href: string) => (queryString ? `${href}?${queryString}` : href);
 
   return (
     <div className="workspace-shell wizard-shell-frame">
@@ -74,7 +77,7 @@ export function WizardShell({ children }: { children: React.ReactNode }) {
             return (
               <Link
                 key={step.href}
-                href={step.href}
+                href={stepHref(step.href)}
                 className={clsx("wizard-step-item", active && "is-active")}
               >
                 <span className="wizard-step-number">{t(`${stepKey}.number`)}</span>

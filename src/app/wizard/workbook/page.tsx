@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTranslation } from "react-i18next";
 
+import { Eye, EyeOff, Shield } from "lucide-react";
 import clsx from "clsx";
 
 import { useWizardProgress } from "@/components/wizard/WizardProgressContext";
@@ -17,13 +18,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { maskCellValue } from "@/lib/masking/cell-masker";
 
 const ALLOWED_TYPES = [".xlsx", ".xls", ".csv"];
 const ALLOWED_LABEL = ".xlsx, .xls, .csv";
 const MAX_SIZE = 50 * 1024 * 1024;
 
 type PageState = "idle" | "uploading" | "success" | "error";
-type UploadPanelTab = "general" | "data-preview" | "profiles";
+type UploadPanelTab = "overview" | "data-preview" | "profiles";
 
 type UploadedFileState = {
   id: string;
@@ -61,7 +63,7 @@ export default function WorkbookStepPage() {
   const initialSheet = searchParams.get("sheet");
   const templateId = searchParams.get("templateId");
   const runId = searchParams.get("runId");
-  const { completeStep, isStepAccessible } = useWizardProgress();
+  const { completeStep, isStepAccessible, setActiveRunId } = useWizardProgress();
   const inputRef = useRef<HTMLInputElement>(null);
 
   const [pageState, setPageState] = useState<PageState>("idle");
@@ -72,7 +74,8 @@ export default function WorkbookStepPage() {
   const [fileSize, setFileSize] = useState<number>(0);
   const [error, setError] = useState<string | null>(null);
   const [isDragging, setIsDragging] = useState(false);
-  const [activePanelTab, setActivePanelTab] = useState<UploadPanelTab>("general");
+  const [activePanelTab, setActivePanelTab] = useState<UploadPanelTab>("overview");
+  const [showMaskedPreview, setShowMaskedPreview] = useState(false);
   const [visibleSampleRowCount, setVisibleSampleRowCount] = useState(5);
   const [selectedSheetName, setSelectedSheetName] = useState<string | null>(null);
 
@@ -117,9 +120,13 @@ export default function WorkbookStepPage() {
         );
         setError(null);
         setPageState("success");
-        setActivePanelTab("general");
+        setActivePanelTab("overview");
+        setShowMaskedPreview(false);
         setVisibleSampleRowCount(5);
         setRestoredUploadId(uploadId);
+        if (runId) {
+          setActiveRunId(runId);
+        }
       } catch (err) {
         if (cancelled) {
           return;
@@ -143,7 +150,7 @@ export default function WorkbookStepPage() {
     return () => {
       cancelled = true;
     };
-  }, [pageState, restoredUploadId, uploadId, uploadedFile, initialSheet]);
+  }, [pageState, restoredUploadId, uploadId, uploadedFile, initialSheet, runId, setActiveRunId, t]);
 
   const uploadFile = useCallback(
     async (file: File) => {
@@ -187,7 +194,8 @@ export default function WorkbookStepPage() {
             : file.size,
         );
         setPageState("success");
-        setActivePanelTab("general");
+        setActivePanelTab("overview");
+        setShowMaskedPreview(false);
         setVisibleSampleRowCount(5);
 
         if (runId) {
@@ -199,6 +207,7 @@ export default function WorkbookStepPage() {
               sourceSheetName: data.preview?.sourceSheetName ?? null,
             }),
           });
+          setActiveRunId(runId);
         }
 
         const replaceParams = new URLSearchParams({ uploadId: data.uploadedFile.id });
@@ -210,7 +219,7 @@ export default function WorkbookStepPage() {
         setPageState("error");
       }
     },
-    [router, templateId, runId],
+    [router, templateId, runId, setActiveRunId, t],
   );
 
   const handleRemove = useCallback(() => {
@@ -222,7 +231,8 @@ export default function WorkbookStepPage() {
     setError(null);
     setRestoredUploadId(uploadId);
     setIsRestoring(false);
-    setActivePanelTab("general");
+    setActivePanelTab("overview");
+    setShowMaskedPreview(false);
     setVisibleSampleRowCount(5);
     const params = new URLSearchParams();
     if (templateId) params.set("templateId", templateId);
@@ -284,7 +294,6 @@ export default function WorkbookStepPage() {
         setPreview(data.preview);
         setSelectedSheetName(sheetName);
         setVisibleSampleRowCount(5);
-        setActivePanelTab("data-preview");
       } catch (err) {
         toast.error("Failed to load sheet", {
           description: err instanceof Error ? err.message : "Unable to load sheet preview.",
@@ -326,6 +335,14 @@ export default function WorkbookStepPage() {
   const columnProfiles = preview?.columnProfiles ?? [];
   const previewHeaders = preview?.headers ?? [];
   const showBusyState = pageState === "uploading" || isRestoring;
+  const profileSummary = columnProfiles.slice(0, 4);
+  const displayedSampleRows = showMaskedPreview
+    ? visibleSampleRows.map((row) =>
+        Object.fromEntries(
+          previewHeaders.map((header) => [header, maskCellValue(row[header])]),
+        ),
+      )
+    : visibleSampleRows;
 
   return (
     <div className="wizard-step-page">
@@ -337,44 +354,44 @@ export default function WorkbookStepPage() {
                 type="button"
                 size="sm"
                 variant="ghost"
-                onClick={() => setActivePanelTab("general")}
+                onClick={() => setActivePanelTab("overview")}
                 className={clsx(
                   "rounded-full px-4",
-                  activePanelTab === "general" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                  activePanelTab === "overview" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
                 )}
-                  aria-pressed={activePanelTab === "general"}
-                >
-                  {t("wizard.workbook.general")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActivePanelTab("data-preview")}
-                  className={clsx(
-                    "rounded-full px-4",
-                    activePanelTab === "data-preview" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
-                  )}
-                  aria-pressed={activePanelTab === "data-preview"}
-                >
-                  {t("wizard.workbook.dataPreview")}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => setActivePanelTab("profiles")}
-                  className={clsx(
-                    "rounded-full px-4",
-                    activePanelTab === "profiles" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
-                  )}
-                  aria-pressed={activePanelTab === "profiles"}
-                >
-                  {t("wizard.workbook.columnProfiles")}
-                </Button>
+                aria-pressed={activePanelTab === "overview"}
+              >
+                {t("wizard.workbook.overview")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setActivePanelTab("data-preview")}
+                className={clsx(
+                  "rounded-full px-4",
+                  activePanelTab === "data-preview" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                )}
+                aria-pressed={activePanelTab === "data-preview"}
+              >
+                {t("wizard.workbook.sheetPreview")}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                onClick={() => setActivePanelTab("profiles")}
+                className={clsx(
+                  "rounded-full px-4",
+                  activePanelTab === "profiles" && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                )}
+                aria-pressed={activePanelTab === "profiles"}
+              >
+                {t("wizard.workbook.columnProfiles")}
+              </Button>
             </div>
 
-            {activePanelTab === "general" ? (
+            {activePanelTab === "overview" ? (
               <div className="space-y-4">
                 <div
                   style={{
@@ -404,7 +421,7 @@ export default function WorkbookStepPage() {
                   <>
                     <div>
                       <p className="dashboard-card-kicker" style={{ marginBottom: "8px" }}>
-                        {t("wizard.workbook.workbookContext")}
+                        {t("wizard.workbook.workbookSummary")}
                       </p>
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {preview.sheetNames.map((name) => (
@@ -429,6 +446,30 @@ export default function WorkbookStepPage() {
                           </button>
                         ))}
                       </div>
+                      <div className="mt-3 flex items-center justify-between gap-3">
+                        <p className="text-xs text-[var(--color-muted)]">
+                          {t("wizard.workbook.sheetSelectionHint")}
+                        </p>
+                        <div className="inline-flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setActivePanelTab("data-preview")}
+                          >
+                            {t("wizard.workbook.openPreview")}
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActivePanelTab("profiles")}
+                            className="gap-2"
+                          >
+                            {t("wizard.workbook.columnProfiles")}
+                          </Button>
+                        </div>
+                      </div>
                     </div>
 
                     <div className="grid gap-3 sm:grid-cols-3">
@@ -451,6 +492,43 @@ export default function WorkbookStepPage() {
                         </p>
                       </div>
                     </div>
+
+                    {profileSummary.length > 0 ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="dashboard-card-kicker">{t("wizard.workbook.profileSummary")}</p>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActivePanelTab("profiles")}
+                            className="px-2"
+                          >
+                            {t("wizard.workbook.viewAllProfiles")}
+                          </Button>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                          {profileSummary.map((col) => (
+                            <div
+                              key={col.name}
+                              className="rounded-xl border border-[var(--color-border)] bg-[rgba(255,255,255,0.55)] p-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <strong className="block truncate text-sm">{col.name}</strong>
+                                <span className="shrink-0 rounded-full bg-[rgba(28,28,28,0.06)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[var(--color-muted)]">
+                                  {col.detectedType}
+                                </span>
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--color-muted)]">
+                                <span>{t("wizard.workbook.profileNullRate", { value: String(Math.round(col.nullRate * 100)) })}</span>
+                                <span>|</span>
+                                <span>{t("wizard.workbook.profileUniqueCount", { value: String(col.uniqueCount ?? 0) })}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </>
                 ) : null}
               </div>
@@ -499,7 +577,7 @@ export default function WorkbookStepPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {visibleSampleRows.map((row, rowIndex) => (
+                        {displayedSampleRows.map((row, rowIndex) => (
                           <TableRow key={rowIndex}>
                             {previewHeaders.map((header) => (
                               <TableCell
@@ -515,6 +593,46 @@ export default function WorkbookStepPage() {
                     </table>
                   </div>
                 ) : null}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1">
+                  <div className="flex items-center gap-2 text-xs text-[var(--color-muted)]">
+                    <Shield className="h-3 w-3" />
+                    <span>
+                      {showMaskedPreview
+                        ? t("wizard.workbook.maskedPreviewHint")
+                        : t("wizard.mapping.trustStatement")}
+                    </span>
+                  </div>
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full border border-[var(--color-border)] bg-[rgba(255,255,255,0.55)] p-1">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowMaskedPreview(false)}
+                      className={clsx(
+                        "rounded-full px-3 gap-2",
+                        !showMaskedPreview && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                      )}
+                      aria-pressed={!showMaskedPreview}
+                    >
+                      <Eye className="h-4 w-4" />
+                      {t("wizard.workbook.unmaskedPreview")}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setShowMaskedPreview(true)}
+                      className={clsx(
+                        "rounded-full px-3 gap-2",
+                        showMaskedPreview && "bg-[var(--surface-panel)] text-[var(--color-ink)] shadow-sm",
+                      )}
+                      aria-pressed={showMaskedPreview}
+                    >
+                      <EyeOff className="h-4 w-4" />
+                      {t("wizard.workbook.maskedPreview")}
+                    </Button>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="min-h-0 flex-1 flex flex-col gap-3 overflow-y-auto">
